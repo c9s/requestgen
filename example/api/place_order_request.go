@@ -30,6 +30,11 @@ const (
 	OrderTypeLimit  OrderType = "limit"
 )
 
+type ComplexArg struct {
+	A, B int
+}
+
+
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
@@ -51,5 +56,7 @@ type PlaceOrderRequest struct {
 	price *string `json:"price,omitempty"`
 
 	timeInForce *TimeInForceType `json:"timeInForce,omitempty"`
+
+	complexArg ComplexArg `json:"complexArg"`
 }
 

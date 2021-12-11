@@ -36,10 +36,11 @@ import (
 )
 
 var (
-	typeNamesStr = flag.String("type", "", "comma-separated list of type names; must be set")
-	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
-	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
-	buildTags    = flag.String("tags", "", "comma-separated list of build tags to apply")
+	typeNamesStr  = flag.String("type", "", "comma-separated list of type names; must be set")
+	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
+	outputStdout  = flag.Bool("stdout", false, "output generated content to the stdout")
+	output        = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
+	buildTags     = flag.String("tags", "", "comma-separated list of build tags to apply")
 )
 
 // File holds a single parsed file and associated data.
@@ -58,7 +59,7 @@ type Package struct {
 type Field struct {
 	Name string
 
-	Type    types.Type
+	Type types.Type
 
 	// ArgType is the argument type of the setter
 	ArgType types.Type
@@ -232,6 +233,11 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				optional = true
 				argType = a.Elem()
 
+			case *types.Named:
+				log.Infof("named: %+v underlying: %+v", a, a.Underlying())
+				debugUnderlying(a)
+
+				argType = a
 			default:
 				argType = a
 
@@ -326,6 +332,10 @@ func (g *Generator) generate(typeName string) {
 		ast.Inspect(file.file, g.nodeParser(typeName, file))
 	}
 
+	if len(g.fields) == 0 {
+		return
+	}
+
 	// conf := types.Config{Importer: importer.Default()}
 
 	var usedImports = map[string]*types.Package{}
@@ -351,6 +361,7 @@ func (g *Generator) generate(typeName string) {
 
 	// scan imports in the first run and use the qualifer to register the imports
 	for _, field := range g.fields {
+		// reference the types that we will use in our template
 		types.TypeString(field.ArgType, qf)
 	}
 
@@ -360,10 +371,11 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	var funcMap = templateFuncs(qf)
-	var setterFuncTemplate = template.New("accessor").Funcs(funcMap)
-	setterFuncTemplate = template.Must(setterFuncTemplate.Parse(`
-func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) {
+	var setterFuncTemplate = template.Must(
+		template.New("accessor").Funcs(funcMap).Parse(`
+func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) *{{ .Field.StructName -}} {
 	{{ .Field.ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
+	return {{ .Field.ReceiverName }}
 }
 `))
 
@@ -387,6 +399,51 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 			log.Fatal(err)
 		}
 	}
+
+	var parameterFuncTemplate *template.Template
+
+	parameterFuncTemplate = template.Must(
+		template.New("parameters").Funcs(funcMap).Parse(`
+
+func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() map[string]interface{} {
+	var params = map[string]interface{}{}
+{{ range .Fields }}
+
+{{ if .Optional }}
+
+	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
+		params[ "{{- .JsonKey -}}" ] = {{- $.FirstField.ReceiverName }}.{{ .Name }}
+	}
+
+{{ else }}
+	params[ "{{- .JsonKey -}}" ] = {{- $.FirstField.ReceiverName }}.{{ .Name }}
+{{ end }}
+
+{{ end }}
+	return params
+}
+`))
+
+	/*
+		switch *parameterType {
+		 case "url":
+		 case "map":
+		}
+	*/
+
+	err := parameterFuncTemplate.Execute(&g.buf, struct {
+		FirstField Field
+		Fields    []Field
+		Qualifier types.Qualifier
+	}{
+		FirstField: g.fields[0],
+		Fields:    g.fields,
+		Qualifier: qf,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 func main() {
@@ -554,3 +611,19 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 
 	return packages.Load(cfg, patterns...)
 }
+
+func debugUnderlying(a types.Type) {
+	underlying := a.Underlying()
+	switch ua := underlying.(type) {
+	case *types.Basic:
+		log.Infof("underlying -> basic: %+v info: %+v kind: %+v", ua, ua.Info(), ua.Kind())
+
+	case *types.Struct:
+		log.Infof("underlying -> struct: %+v numFields: %d", ua, ua.NumFields())
+
+	default:
+		log.Infof("underlying -> default: %+v", ua)
+
+	}
+}
+
