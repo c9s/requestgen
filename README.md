@@ -48,7 +48,7 @@ Then you can do:
 ```go
 req := &PlaceOrderRequest{}
 err := req.Tag(..).
-	OrdType(OrderTypeLimit).
+	OrderType(OrderTypeLimit).
 	Side(SideTypeBuy).
 	Do(ctx)
 ```
