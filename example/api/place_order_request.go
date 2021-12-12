@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 type SideType string
 
 const (
@@ -58,5 +60,7 @@ type PlaceOrderRequest struct {
 	timeInForce *TimeInForceType `param:"timeInForce,omitempty" validValues:"GTC,GTT,FOK"`
 
 	complexArg ComplexArg `param:"complexArg"`
+
+	startTime *time.Time `param:"startTime,milliseconds"`
 }
 

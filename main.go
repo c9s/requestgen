@@ -39,6 +39,7 @@ import (
 var (
 	typeNamesStr  = flag.String("type", "", "comma-separated list of type names; must be set")
 	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
+	debug         = flag.Bool("debug", false, "debug mode")
 	outputStdout  = flag.Bool("stdout", false, "output generated content to the stdout")
 	output        = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
 	buildTags     = flag.String("tags", "", "comma-separated list of build tags to apply")
@@ -70,6 +71,10 @@ type Field struct {
 	IsString bool
 
 	IsInt bool
+
+	IsTime bool
+
+	IsMillisecondsTime bool
 
 	// SetterName is the method name of the setter
 	SetterName string
@@ -257,8 +262,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				jsonKey = paramTag.Name
 			}
 
-			required := paramTag.HasOption("required")
-
 			// The field.Type is an ast Type, we can't use that.
 			// So we need to find the abstract type information from the types info
 			typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
@@ -280,6 +283,14 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			argKind = getBasicKind(argType)
 			isString := isTypeString(argType)
 			isInt := isTypeInt(argType)
+			isTime := argType.String() == "time.Time"
+			required := paramTag.HasOption("required")
+			isMillisecondsTime := paramTag.HasOption("milliseconds")
+
+			if !isTime && isMillisecondsTime {
+				log.Errorf("milliseconds option is not valid for non time.Time type field")
+				return
+			}
 
 			fieldName := field.Names[0].Name
 			debugUnderlying(fieldName, argType)
@@ -314,16 +325,18 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			}
 
 			g.fields = append(g.fields, Field{
-				Name:        field.Names[0].Name,
-				Type:        typeValue.Type,
-				ArgType:     argType,
-				SetterName:  setterName,
-				IsString:    isString,
-				IsInt:       isInt,
-				JsonKey:     jsonKey,
-				Optional:    optional,
-				Required:    required,
-				ValidValues: validValues,
+				Name:               field.Names[0].Name,
+				Type:               typeValue.Type,
+				ArgType:            argType,
+				SetterName:         setterName,
+				IsString:           isString,
+				IsInt:              isInt,
+				IsTime:             isTime,
+				IsMillisecondsTime: isMillisecondsTime,
+				JsonKey:            jsonKey,
+				Optional:           optional,
+				Required:           required,
+				ValidValues:        validValues,
 
 				StructName:     typeSpec.Name.String(),
 				StructTypeName: fullTypeName,
@@ -409,7 +422,11 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
-	usedPkg, err := parsePackage([]string{"fmt", "net/url"}, nil)
+	usedPkg, err := parsePackage([]string{
+		"fmt",
+		"net/url",
+		"strconv",
+	}, nil)
 	if err != nil {
 		log.WithError(err).Errorf("parse package error")
 		return
@@ -512,6 +529,15 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	{{- end }}
 {{- end }}
 
+{{- define "assign" }}
+{{- if and .IsTime .IsMillisecondsTime }}
+	// convert time.Time to milliseconds time
+	params[ "{{- .JsonKey -}}" ] = strconv.FormatInt({{ .Name }}.UnixNano()/int64(time.Millisecond), 10)
+{{- else }}
+	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+{{- end -}}
+{{- end }}
+
 func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 {{- range .Fields }}
@@ -525,7 +551,7 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]i
 
 		{{ template "check-valid-values" . }}
 
-		params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+		{{ template "assign" . }}
 	}
 {{- else }}
 	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
@@ -534,7 +560,7 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]i
 
 	{{ template "check-valid-values" . }}
 
-	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+	{{ template "assign" . }}
 {{- end }}
 
 {{- end }}
@@ -585,6 +611,10 @@ func main() {
 	if len(*typeNamesStr) == 0 {
 		flag.Usage()
 		os.Exit(2)
+	}
+
+	if *debug {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	typeNames := strings.Split(*typeNamesStr, ",")
@@ -809,7 +839,7 @@ func debugUnderlying(k string, a types.Type) {
 	underlying := a.Underlying()
 	switch ua := underlying.(type) {
 	case *types.Basic:
-		log.Debugf("%s underlying -> basic: %+v info: %+v kind: %+v", k, ua, ua.Info(), ua.Kind())
+		log.Debugf("%s %+v underlying -> basic: %+v info: %+v kind: %+v", k, a, ua, ua.Info(), ua.Kind())
 		switch ua.Kind() {
 		case types.String:
 		case types.Int:
@@ -818,10 +848,10 @@ func debugUnderlying(k string, a types.Type) {
 		}
 
 	case *types.Struct:
-		log.Debugf("%s underlying -> struct: %+v numFields: %d", k, ua, ua.NumFields())
+		log.Debugf("%s %+v underlying -> struct: %+v numFields: %d", k, a, ua, ua.NumFields())
 
 	default:
-		log.Debugf("%s underlying -> default: %+v", k, ua)
+		log.Debugf("%s %+v underlying -> default: %+v", k, a, ua)
 
 	}
 }
