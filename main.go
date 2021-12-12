@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -64,6 +65,8 @@ type Field struct {
 	// ArgType is the argument type of the setter
 	ArgType types.Type
 
+	ArgKind types.BasicKind
+
 	IsString bool
 
 	IsInt bool
@@ -79,7 +82,7 @@ type Field struct {
 
 	File *ast.File
 
-	ValidValues []interface{}
+	ValidValues interface{}
 
 	// StructName is the struct of the given request type
 	StructName     string
@@ -88,7 +91,32 @@ type Field struct {
 	ReceiverName   string
 }
 
-func paramsTuple(a types.Type) *types.Tuple {
+// toGoTupleString converts type to go literal tuple
+func toGoTupleString(a interface{}) string {
+	switch v := a.(type) {
+	case []int:
+		var ss []string
+		for _, i := range v {
+			ss = append(ss, strconv.Itoa(i))
+		}
+		return strings.Join(ss, ", ")
+
+	case []string:
+		var qs []string
+		for _, s := range v {
+			qs = append(qs, strconv.Quote(s))
+		}
+		return strings.Join(qs, ", ")
+
+	default:
+		panic(fmt.Errorf("unsupported type: %+v", v))
+
+	}
+
+	return "nil"
+}
+
+func typeParamsTuple(a types.Type) *types.Tuple {
 	switch a := a.(type) {
 
 	// pure signature callback, like:
@@ -100,7 +128,7 @@ func paramsTuple(a types.Type) *types.Tuple {
 	// named type callback, like: BookGenerator, RequestHandler, PositionUpdater
 	case *types.Named:
 		// fetch the underlying type and return the params tuple
-		return paramsTuple(a.Underlying())
+		return typeParamsTuple(a.Underlying())
 
 	default:
 		return nil
@@ -217,9 +245,8 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				continue
 			}
 
-			jsonTag, err := tags.Get("json")
+			jsonTag, err := tags.Get("param")
 			if err != nil {
-				log.WithError(err).Errorf("invalid json tag")
 				continue
 			}
 
@@ -235,6 +262,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			}
 
 			var argType types.Type
+			var argKind types.BasicKind
 
 			switch a := typeValue.Type.(type) {
 			case *types.Pointer:
@@ -244,20 +272,52 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				argType = a
 			}
 
+			argKind = getBasicKind(argType)
+			isString := isTypeString(argType)
+			isInt := isTypeInt(argType)
+
+			fieldName := field.Names[0].Name
+			debugUnderlying(fieldName, argType)
+
+			var validValues interface{}
+			validValuesTag, _ := tags.Get("validValues")
+			if validValuesTag != nil {
+				validValueList := strings.Split(validValuesTag.Value(), ",")
+
+				log.Debugf("%s found valid values: %v", fieldName, validValueList)
+
+				switch argKind {
+				case types.Int, types.Int64, types.Int32:
+					var slice []int
+					for _, s := range validValueList {
+						i, err := strconv.Atoi(s)
+						if err != nil {
+							return
+						}
+						slice = append(slice, i)
+					}
+
+				case types.String:
+					validValues = validValueList
+
+				}
+			}
+
 			receiverName, ok := g.structTypeReceiverNames[fullTypeName]
 			if !ok {
 				receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
 			}
 
 			g.fields = append(g.fields, Field{
-				Name:       field.Names[0].Name,
-				Type:       typeValue.Type,
-				ArgType:    argType,
-				SetterName: setterName,
-				IsString:   isTypeString(argType),
-				IsInt:      isTypeInt(argType),
-				JsonKey:    jsonKey,
-				Optional:   optional,
+				Name:        field.Names[0].Name,
+				Type:        typeValue.Type,
+				ArgType:     argType,
+				SetterName:  setterName,
+				IsString:    isString,
+				IsInt:       isInt,
+				JsonKey:     jsonKey,
+				Optional:    optional,
+				ValidValues: validValues,
 
 				StructName:     typeSpec.Name.String(),
 				StructTypeName: fullTypeName,
@@ -408,22 +468,44 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
 
-func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() map[string]interface{} {
+func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-{{ range .Fields }}
+{{- range .Fields }}
 
-{{ if .Optional }}
-
+{{- if .Optional }}
 	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
-		params[ "{{- .JsonKey -}}" ] = {{- $.FirstField.ReceiverName }}.{{ .Name }}
+		{{- if .ValidValues }}
+		a := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+		switch a {
+			case {{ toGoTupleString .ValidValues }}:
+				params[ "{{- .JsonKey -}}" ] = a
+
+			default:
+				return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
+
+		}
+		{{- else }}
+		params[ "{{- .JsonKey -}}" ] = *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+		{{- end }}
 	}
+{{- else }}
+	{{- if .ValidValues }}
+	a := {{- $.FirstField.ReceiverName }}.{{ .Name }}
+	switch a {
+		case {{ toGoTupleString .ValidValues }}:
+			params[ "{{- .JsonKey -}}" ] = a
 
-{{ else }}
+		default:
+			return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
+
+	}
+	{{- else }}
 	params[ "{{- .JsonKey -}}" ] = {{- $.FirstField.ReceiverName }}.{{ .Name }}
-{{ end }}
+	{{- end }}
+{{- end }}
 
-{{ end }}
-	return params
+{{- end }}
+	return params, nil
 }
 `))
 
@@ -528,8 +610,8 @@ func main() {
 	}
 }
 
-// tupleString converts Tuple types to string
-func tupleString(tup *types.Tuple, variadic bool, qf types.Qualifier) string {
+// typeTupleString converts Tuple types to string
+func typeTupleString(tup *types.Tuple, variadic bool, qf types.Qualifier) string {
 	buf := bytes.NewBuffer(nil)
 	// buf.WriteByte('(')
 	if tup != nil {
@@ -578,8 +660,9 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 		"join": func(sep string, a []string) interface{} {
 			return strings.Join(a, sep)
 		},
-		"tupleString": func(a *types.Tuple) interface{} {
-			return tupleString(a, false, qf)
+		"toGoTupleString": toGoTupleString,
+		"typeTupleString": func(a *types.Tuple) interface{} {
+			return typeTupleString(a, false, qf)
 		},
 		"typeString": func(a types.Type) interface{} {
 			return types.TypeString(a, qf)
@@ -621,9 +704,12 @@ func getUnderlyingType(a types.Type) types.Type {
 		a = p.Elem()
 	}
 
-	n, ok := a.(*types.Named)
-	if ok {
-		a = n.Underlying()
+	for {
+		if n, ok := a.(*types.Named); ok {
+			a = n.Underlying()
+		} else {
+			break
+		}
 	}
 
 	return a
@@ -645,6 +731,17 @@ func isTypeInt(a types.Type) bool {
 	return false
 }
 
+func getBasicKind(a types.Type) types.BasicKind {
+	a = getUnderlyingType(a)
+	switch ua := a.(type) {
+
+	case *types.Basic:
+		return ua.Kind()
+	}
+
+	return 0
+}
+
 func isTypeString(a types.Type) bool {
 	a = getUnderlyingType(a)
 	switch ua := a.(type) {
@@ -657,11 +754,11 @@ func isTypeString(a types.Type) bool {
 	return false
 }
 
-func debugUnderlying(a types.Type) {
+func debugUnderlying(k string, a types.Type) {
 	underlying := a.Underlying()
 	switch ua := underlying.(type) {
 	case *types.Basic:
-		log.Infof("underlying -> basic: %+v info: %+v kind: %+v", ua, ua.Info(), ua.Kind())
+		log.Debugf("%s underlying -> basic: %+v info: %+v kind: %+v", k, ua, ua.Info(), ua.Kind())
 		switch ua.Kind() {
 		case types.String:
 		case types.Int:
@@ -670,10 +767,10 @@ func debugUnderlying(a types.Type) {
 		}
 
 	case *types.Struct:
-		log.Infof("underlying -> struct: %+v numFields: %d", ua, ua.NumFields())
+		log.Debugf("%s underlying -> struct: %+v numFields: %d", k, ua, ua.NumFields())
 
 	default:
-		log.Infof("underlying -> default: %+v", ua)
+		log.Debugf("%s underlying -> default: %+v", k, ua)
 
 	}
 }

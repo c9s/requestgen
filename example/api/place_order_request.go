@@ -38,25 +38,25 @@ type ComplexArg struct {
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string `json:"clientOid,omitempty"`
+	clientOrderID *string `param:"clientOid,omitempty"`
 
-	symbol string `json:"symbol"`
+	symbol string `param:"symbol"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string `json:"tag"`
+	tag *string `param:"tag"`
 
 	// "buy" or "sell"
-	side SideType `json:"side"`
+	side SideType `param:"side" validValues:"buy,sell"`
 
-	ordType OrderType `json:"ordType"`
+	ordType OrderType `param:"ordType" validValues:"limit,market"`
 
-	size string `json:"size"`
+	size string `param:"size"`
 
 	// limit order parameters
-	price *string `json:"price,omitempty"`
+	price *string `param:"price,omitempty"`
 
-	timeInForce *TimeInForceType `json:"timeInForce,omitempty"`
+	timeInForce *TimeInForceType `param:"timeInForce,omitempty" validValues:"GTC,GTT,FOK"`
 
-	complexArg ComplexArg `json:"complexArg"`
+	complexArg ComplexArg `param:"complexArg"`
 }
 
