@@ -18,7 +18,7 @@ package api
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string `param:"clientOid,required"`
+	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
 
 	symbol string `param:"symbol,required"`
 
@@ -38,6 +38,8 @@ type PlaceOrderRequest struct {
 	timeInForce *TimeInForceType `param:"timeInForce,omitempty" validValues:"GTC,GTT,FOK"`
 
 	complexArg ComplexArg `param:"complexArg"`
+
+	startTime *time.Time `param:"startTime,milliseconds" defaultValuer:"now()"`
 }
 ```
 
