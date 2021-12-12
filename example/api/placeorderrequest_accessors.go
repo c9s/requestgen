@@ -50,33 +50,49 @@ func (p *PlaceOrderRequest) ComplexArg(complexArg ComplexArg) *PlaceOrderRequest
 func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 	if p.clientOrderID != nil {
-		params["clientOid"] = *p.clientOrderID
+		a := *p.clientOrderID
+		if len(a) == 0 {
+			return params, fmt.Errorf("clientOid is required, empty string given")
+		}
+		params["clientOid"] = a
 	}
-	params["symbol"] = p.symbol
+	symbol := p.symbol
+	if len(symbol) == 0 {
+		return params, fmt.Errorf("symbol is required, empty string given")
+	}
+	params["symbol"] = symbol
 	if p.tag != nil {
-		params["tag"] = *p.tag
+		a := *p.tag
+		params["tag"] = a
 	}
-	a := p.side
-	switch a {
+	side := p.side
+	if len(side) == 0 {
+		return params, fmt.Errorf("side is required, empty string given")
+	}
+	switch side {
 	case "buy", "sell":
-		params["side"] = a
+		params["side"] = side
 
 	default:
 		return params, fmt.Errorf("side value %v is not valid", a)
 
 	}
-	a := p.ordType
-	switch a {
+	params["side"] = side
+	ordType := p.ordType
+	switch ordType {
 	case "limit", "market":
-		params["ordType"] = a
+		params["ordType"] = ordType
 
 	default:
 		return params, fmt.Errorf("ordType value %v is not valid", a)
 
 	}
-	params["size"] = p.size
+	params["ordType"] = ordType
+	size := p.size
+	params["size"] = size
 	if p.price != nil {
-		params["price"] = *p.price
+		a := *p.price
+		params["price"] = a
 	}
 	if p.timeInForce != nil {
 		a := *p.timeInForce
@@ -88,7 +104,9 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 			return params, fmt.Errorf("timeInForce value %v is not valid", a)
 
 		}
+		params["timeInForce"] = a
 	}
-	params["complexArg"] = p.complexArg
+	complexArg := p.complexArg
+	params["complexArg"] = complexArg
 	return params, nil
 }

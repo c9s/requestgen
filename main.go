@@ -80,6 +80,9 @@ type Field struct {
 	// Optional - is this field an optional parameter?
 	Optional bool
 
+	// Required means we will check the interval value of the field, empty string or zero will be rejected
+	Required bool
+
 	File *ast.File
 
 	ValidValues interface{}
@@ -254,6 +257,8 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				jsonKey = paramTag.Name
 			}
 
+			required := paramTag.HasOption("required")
+
 			// The field.Type is an ast Type, we can't use that.
 			// So we need to find the abstract type information from the types info
 			typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
@@ -317,6 +322,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				IsInt:       isInt,
 				JsonKey:     jsonKey,
 				Optional:    optional,
+				Required:    required,
 				ValidValues: validValues,
 
 				StructName:     typeSpec.Name.String(),
@@ -474,8 +480,20 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 
 {{- if .Optional }}
 	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
-		{{- if .ValidValues }}
 		a := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+		{{- if .Required }}
+		{{- if .IsString }}
+		if len(a) == 0 {
+			 return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
+		}
+		{{- else if .IsInt }}
+		if a == 0 {
+			 return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+		}
+		{{- end }}
+		{{- end }}
+
+		{{- if .ValidValues }}
 		switch a {
 			case {{ toGoTupleString .ValidValues }}:
 				params[ "{{- .JsonKey -}}" ] = a
@@ -484,24 +502,34 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 				return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
 
 		}
-		{{- else }}
-		params[ "{{- .JsonKey -}}" ] = *{{- $.FirstField.ReceiverName }}.{{ .Name }}
 		{{- end }}
+		params[ "{{- .JsonKey -}}" ] = a
 	}
 {{- else }}
+	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
+	{{- if .Required }}
+		{{- if .IsString }}
+		if len({{ .Name }}) == 0 {
+			return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
+		}
+		{{- else if .IsInt }}
+		if {{ .Name }} == 0 {
+			return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+		}
+		{{- end }}
+	{{- end }}
+
 	{{- if .ValidValues }}
-	a := {{- $.FirstField.ReceiverName }}.{{ .Name }}
-	switch a {
+	switch {{ .Name }} {
 		case {{ toGoTupleString .ValidValues }}:
-			params[ "{{- .JsonKey -}}" ] = a
+			params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 
 		default:
 			return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
 
 	}
-	{{- else }}
-	params[ "{{- .JsonKey -}}" ] = {{- $.FirstField.ReceiverName }}.{{ .Name }}
 	{{- end }}
+	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 {{- end }}
 
 {{- end }}
