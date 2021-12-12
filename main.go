@@ -76,6 +76,8 @@ type Field struct {
 
 	DefaultValuer string
 
+	Default interface{}
+
 	IsMillisecondsTime bool
 
 	// SetterName is the method name of the setter
@@ -293,6 +295,9 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 
 			if isTime {
 				g.importPackages["time"] = struct{}{}
+				if isMillisecondsTime {
+					g.importPackages["strconv"] = struct{}{}
+				}
 			}
 
 			if !isTime && isMillisecondsTime {
@@ -447,7 +452,6 @@ func (g *Generator) generate(typeName string) {
 	usedPkgNames := []string{
 		"fmt",
 		"net/url",
-		"strconv",
 	}
 
 	for n := range g.importPackages {
