@@ -74,6 +74,8 @@ type Field struct {
 
 	IsTime bool
 
+	DefaultValuer string
+
 	IsMillisecondsTime bool
 
 	// SetterName is the method name of the setter
@@ -150,6 +152,8 @@ type Generator struct {
 
 	// structTypeReceiverNames is used for collecting the receiver name of the given struct types
 	structTypeReceiverNames map[string]string
+
+	importPackages map[string]struct{}
 
 	// the collected fields
 	fields []Field
@@ -287,9 +291,26 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			required := paramTag.HasOption("required")
 			isMillisecondsTime := paramTag.HasOption("milliseconds")
 
+			if isTime {
+				g.importPackages["time"] = struct{}{}
+			}
+
 			if !isTime && isMillisecondsTime {
 				log.Errorf("milliseconds option is not valid for non time.Time type field")
 				return
+			}
+
+			var defaultValuer string
+			defaultTag, _ := tags.Get("defaultValuer")
+			if defaultTag != nil {
+				defaultValuer = defaultTag.Value()
+				switch defaultValuer {
+				case "now()":
+					g.importPackages["time"] = struct{}{}
+				case "uuid()":
+					g.importPackages["github.com/google/uuid"] = struct{}{}
+
+				}
 			}
 
 			fieldName := field.Names[0].Name
@@ -337,6 +358,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				Optional:           optional,
 				Required:           required,
 				ValidValues:        validValues,
+				DefaultValuer:      defaultValuer,
 
 				StructName:     typeSpec.Name.String(),
 				StructTypeName: fullTypeName,
@@ -422,11 +444,17 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
-	usedPkg, err := parsePackage([]string{
+	usedPkgNames := []string{
 		"fmt",
 		"net/url",
 		"strconv",
-	}, nil)
+	}
+
+	for n := range g.importPackages {
+		usedPkgNames = append(usedPkgNames, n)
+	}
+
+	usedPkg, err := parsePackage(usedPkgNames, nil)
 	if err != nil {
 		log.WithError(err).Errorf("parse package error")
 		return
@@ -552,6 +580,14 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]i
 		{{ template "check-valid-values" . }}
 
 		{{ template "assign" . }}
+	} else {
+		{{- if eq .DefaultValuer "now()" }}
+		{{ .Name }} := time.Now()
+		{{ template "assign" . }}
+		{{- else if eq .DefaultValuer "uuid()" }}
+		{{ .Name }} := uuid.New().String()
+		{{ template "assign" . }}
+		{{- end }}
 	}
 {{- else }}
 	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
@@ -645,6 +681,7 @@ func main() {
 
 	g := Generator{
 		structTypeReceiverNames: map[string]string{},
+		importPackages:          map[string]struct{}{},
 	}
 
 	pkgs, err := parsePackage(args, tags)

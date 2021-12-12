@@ -4,6 +4,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"net/url"
 	"strconv"
 	"time"
@@ -71,6 +72,10 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		}
 
 		params["clientOid"] = clientOrderID
+	} else {
+		clientOrderID := uuid.New().String()
+
+		params["clientOid"] = clientOrderID
 	}
 
 	// check symbol field -> json key symbol
@@ -87,6 +92,7 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		tag := *p.tag
 
 		params["tag"] = tag
+	} else {
 	}
 
 	// check side field -> json key side
@@ -131,6 +137,7 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		price := *p.price
 
 		params["price"] = price
+	} else {
 	}
 
 	// check timeInForce field -> json key timeInForce
@@ -147,6 +154,7 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		}
 
 		params["timeInForce"] = timeInForce
+	} else {
 	}
 
 	// check complexArg field -> json key complexArg
@@ -157,6 +165,11 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	// check startTime field -> json key startTime
 	if p.startTime != nil {
 		startTime := *p.startTime
+
+		// convert time.Time to milliseconds time
+		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+	} else {
+		startTime := time.Now()
 
 		// convert time.Time to milliseconds time
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
