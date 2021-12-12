@@ -64,6 +64,10 @@ type Field struct {
 	// ArgType is the argument type of the setter
 	ArgType types.Type
 
+	IsString bool
+
+	IsInt bool
+
 	// SetterName is the method name of the setter
 	SetterName string
 
@@ -74,6 +78,8 @@ type Field struct {
 	Optional bool
 
 	File *ast.File
+
+	ValidValues []interface{}
 
 	// StructName is the struct of the given request type
 	StructName     string
@@ -234,15 +240,8 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			case *types.Pointer:
 				optional = true
 				argType = a.Elem()
-
-			case *types.Named:
-				log.Infof("named: %+v underlying: %+v", a, a.Underlying())
-				debugUnderlying(a)
-
-				argType = a
 			default:
 				argType = a
-
 			}
 
 			receiverName, ok := g.structTypeReceiverNames[fullTypeName]
@@ -255,6 +254,8 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				Type:       typeValue.Type,
 				ArgType:    argType,
 				SetterName: setterName,
+				IsString:   isTypeString(argType),
+				IsInt:      isTypeInt(argType),
 				JsonKey:    jsonKey,
 				Optional:   optional,
 
@@ -612,6 +613,48 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 	}
 
 	return packages.Load(cfg, patterns...)
+}
+
+func getUnderlyingType(a types.Type) types.Type {
+	p, ok := a.(*types.Pointer)
+	if ok {
+		a = p.Elem()
+	}
+
+	n, ok := a.(*types.Named)
+	if ok {
+		a = n.Underlying()
+	}
+
+	return a
+}
+
+func isTypeInt(a types.Type) bool {
+	a = getUnderlyingType(a)
+	switch ua := a.(type) {
+
+	case *types.Basic:
+		switch ua.Kind() {
+		case types.Int, types.Int32, types.Int64:
+			return true
+
+		}
+
+	}
+
+	return false
+}
+
+func isTypeString(a types.Type) bool {
+	a = getUnderlyingType(a)
+	switch ua := a.(type) {
+
+	case *types.Basic:
+		return ua.Kind() == types.String
+
+	}
+
+	return false
 }
 
 func debugUnderlying(a types.Type) {
