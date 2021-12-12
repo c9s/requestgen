@@ -245,13 +245,13 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				continue
 			}
 
-			jsonTag, err := tags.Get("param")
+			paramTag, err := tags.Get("param")
 			if err != nil {
 				continue
 			}
 
-			if len(jsonTag.Name) > 0 {
-				jsonKey = jsonTag.Name
+			if len(paramTag.Name) > 0 {
+				jsonKey = paramTag.Name
 			}
 
 			// The field.Type is an ast Type, we can't use that.
