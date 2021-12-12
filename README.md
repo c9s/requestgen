@@ -28,7 +28,7 @@ type PlaceOrderRequest struct {
 	// "buy" or "sell"
 	side SideType `param:"side,required" validValues:"buy,sell"`
 
-	ordType OrderType `param:"ordType" validValues:"limit,market"`
+	orderType OrderType `param:"ordType" validValues:"limit,market"`
 
 	size string `param:"size"`
 
