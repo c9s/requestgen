@@ -409,7 +409,7 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
-	usedPkg, err := parsePackage([]string{"fmt"}, nil)
+	usedPkg, err := parsePackage([]string{"fmt", "net/url"}, nil)
 	if err != nil {
 		log.WithError(err).Errorf("parse package error")
 		return
@@ -482,6 +482,9 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
+
+{{ $recv := .FirstField.ReceiverName }}
+
 {{- define "check-required" }}
 {{- if .Required }}
 	{{- if .IsString }}
@@ -509,7 +512,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	{{- end }}
 {{- end }}
 
-func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
+func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 {{- range .Fields }}
 
@@ -537,6 +540,22 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 {{- end }}
 	return params, nil
 }
+
+func ({{- $recv }} *{{ .FirstField.StructName -}}) getQuery() (url.Values, error) {
+	query := url.Values{}
+
+	params, err := {{ $recv }}.getParameters()
+	if err != nil {
+		return query, err
+	}
+
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
 `))
 
 	/*

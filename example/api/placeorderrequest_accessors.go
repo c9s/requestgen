@@ -4,6 +4,7 @@ package api
 
 import (
 	"fmt"
+	"net/url"
 )
 
 func (p *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
@@ -146,4 +147,19 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 
 	params["complexArg"] = complexArg
 	return params, nil
+}
+
+func (p *PlaceOrderRequest) getQuery() (url.Values, error) {
+	query := url.Values{}
+
+	params, err := p.getParameters()
+	if err != nil {
+		return query, err
+	}
+
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
 }
