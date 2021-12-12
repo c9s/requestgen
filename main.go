@@ -199,24 +199,26 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				jsonKey = name
 			}
 
-			if field.Tag != nil {
-				tag := field.Tag.Value
-				tag = strings.Trim(tag, "`")
-				tags, err := structtag.Parse(tag)
-				if err != nil {
-					log.WithError(err).Errorf("struct tag parse error, tag: %s", tag)
-					continue
-				}
+			if field.Tag == nil {
+				continue
+			}
 
-				jsonTag, err := tags.Get("json")
-				if err != nil {
-					log.WithError(err).Errorf("invalid json tag")
-					continue
-				}
+			tag := field.Tag.Value
+			tag = strings.Trim(tag, "`")
+			tags, err := structtag.Parse(tag)
+			if err != nil {
+				log.WithError(err).Errorf("struct tag parse error, tag: %s", tag)
+				continue
+			}
 
-				if len(jsonTag.Name) > 0 {
-					jsonKey = jsonTag.Name
-				}
+			jsonTag, err := tags.Get("json")
+			if err != nil {
+				log.WithError(err).Errorf("invalid json tag")
+				continue
+			}
+
+			if len(jsonTag.Name) > 0 {
+				jsonKey = jsonTag.Name
 			}
 
 			// The field.Type is an ast Type, we can't use that.
@@ -433,12 +435,12 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 
 	err := parameterFuncTemplate.Execute(&g.buf, struct {
 		FirstField Field
-		Fields    []Field
-		Qualifier types.Qualifier
+		Fields     []Field
+		Qualifier  types.Qualifier
 	}{
 		FirstField: g.fields[0],
-		Fields:    g.fields,
-		Qualifier: qf,
+		Fields:     g.fields,
+		Qualifier:  qf,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -617,6 +619,12 @@ func debugUnderlying(a types.Type) {
 	switch ua := underlying.(type) {
 	case *types.Basic:
 		log.Infof("underlying -> basic: %+v info: %+v kind: %+v", ua, ua.Info(), ua.Kind())
+		switch ua.Kind() {
+		case types.String:
+		case types.Int:
+		case types.Bool:
+
+		}
 
 	case *types.Struct:
 		log.Infof("underlying -> struct: %+v numFields: %d", ua, ua.NumFields())
@@ -626,4 +634,3 @@ func debugUnderlying(a types.Type) {
 
 	}
 }
-
