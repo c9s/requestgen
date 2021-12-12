@@ -2,6 +2,10 @@
 
 package api
 
+import (
+	"fmt"
+)
+
 func (p *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
 	p.clientOrderID = &clientOrderID
 	return p
@@ -50,11 +54,11 @@ func (p *PlaceOrderRequest) ComplexArg(complexArg ComplexArg) *PlaceOrderRequest
 func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 	if p.clientOrderID != nil {
-		a := *p.clientOrderID
-		if len(a) == 0 {
+		clientOrderID := *p.clientOrderID
+		if len(clientOrderID) == 0 {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
-		params["clientOid"] = a
+		params["clientOid"] = clientOrderID
 	}
 	symbol := p.symbol
 	if len(symbol) == 0 {
@@ -62,8 +66,8 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	}
 	params["symbol"] = symbol
 	if p.tag != nil {
-		a := *p.tag
-		params["tag"] = a
+		tag := *p.tag
+		params["tag"] = tag
 	}
 	side := p.side
 	if len(side) == 0 {
@@ -74,7 +78,7 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		params["side"] = side
 
 	default:
-		return params, fmt.Errorf("side value %v is not valid", a)
+		return params, fmt.Errorf("side value %v is not valid", side)
 
 	}
 	params["side"] = side
@@ -84,27 +88,27 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		params["ordType"] = ordType
 
 	default:
-		return params, fmt.Errorf("ordType value %v is not valid", a)
+		return params, fmt.Errorf("ordType value %v is not valid", ordType)
 
 	}
 	params["ordType"] = ordType
 	size := p.size
 	params["size"] = size
 	if p.price != nil {
-		a := *p.price
-		params["price"] = a
+		price := *p.price
+		params["price"] = price
 	}
 	if p.timeInForce != nil {
-		a := *p.timeInForce
-		switch a {
+		timeInForce := *p.timeInForce
+		switch timeInForce {
 		case "GTC", "GTT", "FOK":
-			params["timeInForce"] = a
+			params["timeInForce"] = timeInForce
 
 		default:
-			return params, fmt.Errorf("timeInForce value %v is not valid", a)
+			return params, fmt.Errorf("timeInForce value %v is not valid", timeInForce)
 
 		}
-		params["timeInForce"] = a
+		params["timeInForce"] = timeInForce
 	}
 	complexArg := p.complexArg
 	params["complexArg"] = complexArg

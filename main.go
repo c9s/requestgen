@@ -409,10 +409,19 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
+	usedPkg, err := parsePackage([]string{"fmt"}, nil)
+	if err != nil {
+		log.WithError(err).Errorf("parse package error")
+		return
+	}
+	for _, pkg := range usedPkg {
+		usedImports[pkg.Name] = pkg.Types
+	}
+
 	pkgTypes := g.pkg.pkg.Types
 	qf := func(other *types.Package) string {
 
-		log.Infof("solving:%s current:%s", other.Path(), pkgTypes.Path())
+		log.Debugf("solving:%s current:%s", other.Path(), pkgTypes.Path())
 		if pkgTypes == other {
 			return "" // same package; unqualified
 		}
@@ -480,30 +489,30 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 
 {{- if .Optional }}
 	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
-		a := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+		{{ .Name }} := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
 		{{- if .Required }}
 		{{- if .IsString }}
-		if len(a) == 0 {
+		if len({{ .Name }}) == 0 {
 			 return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
 		}
 		{{- else if .IsInt }}
-		if a == 0 {
+		if {{ .Name }} == 0 {
 			 return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
 		}
 		{{- end }}
 		{{- end }}
 
 		{{- if .ValidValues }}
-		switch a {
+		switch {{ .Name }} {
 			case {{ toGoTupleString .ValidValues }}:
-				params[ "{{- .JsonKey -}}" ] = a
+				params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 
 			default:
-				return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
+				return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", {{ .Name }})
 
 		}
 		{{- end }}
-		params[ "{{- .JsonKey -}}" ] = a
+		params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 	}
 {{- else }}
 	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
@@ -525,7 +534,7 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 			params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 
 		default:
-			return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", a)
+			return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", {{ .Name }})
 
 	}
 	{{- end }}
@@ -544,7 +553,7 @@ func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParamet
 		}
 	*/
 
-	err := parameterFuncTemplate.Execute(&g.buf, struct {
+	err = parameterFuncTemplate.Execute(&g.buf, struct {
 		FirstField Field
 		Fields     []Field
 		Qualifier  types.Qualifier
