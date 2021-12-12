@@ -41,6 +41,18 @@ type PlaceOrderRequest struct {
 }
 ```
 
+Then you can do:
+
+```go
+req := &PlaceOrderRequest{}
+err := req.Tag(..).
+	OrdType(OrderTypeLimit).
+	Side(SideTypeBuy).
+	Do(ctx)
+```
+
+Note that you need to implement Do() by yourself.
+
 # LICENSE
 
 MIT License
