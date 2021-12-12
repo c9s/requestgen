@@ -648,7 +648,9 @@ func main() {
 		// Write to file.
 		outputName := *output
 		if outputName == "" {
-			baseName := fmt.Sprintf("%s_accessors.go", typeNames[0])
+			ss := camelcase.Split(typeNames[0])
+			fn := strings.Join(ss, "_")
+			baseName := fmt.Sprintf("%s_accessors.go", fn)
 			outputName = filepath.Join(dir, strings.ToLower(baseName))
 		}
 		err = ioutil.WriteFile(outputName, src, 0644)
