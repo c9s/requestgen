@@ -482,62 +482,55 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
-
-func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
-	var params = map[string]interface{}{}
-{{- range .Fields }}
-
-{{- if .Optional }}
-	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
-		{{ .Name }} := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
-		{{- if .Required }}
-		{{- if .IsString }}
-		if len({{ .Name }}) == 0 {
-			 return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
-		}
-		{{- else if .IsInt }}
-		if {{ .Name }} == 0 {
-			 return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
-		}
-		{{- end }}
-		{{- end }}
-
-		{{- if .ValidValues }}
-		switch {{ .Name }} {
-			case {{ toGoTupleString .ValidValues }}:
-				params[ "{{- .JsonKey -}}" ] = {{ .Name }}
-
-			default:
-				return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", {{ .Name }})
-
-		}
-		{{- end }}
-		params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+{{- define "check-required" }}
+{{- if .Required }}
+	{{- if .IsString }}
+	if len({{ .Name }}) == 0 {
+		 return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
 	}
-{{- else }}
-	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
-	{{- if .Required }}
-		{{- if .IsString }}
-		if len({{ .Name }}) == 0 {
-			return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
-		}
-		{{- else if .IsInt }}
-		if {{ .Name }} == 0 {
-			return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
-		}
-		{{- end }}
+	{{- else if .IsInt }}
+	if {{ .Name }} == 0 {
+		 return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+	}
 	{{- end }}
+{{- end }}
+{{- end }}
 
+{{- define "check-valid-values" }}
 	{{- if .ValidValues }}
 	switch {{ .Name }} {
 		case {{ toGoTupleString .ValidValues }}:
 			params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 
 		default:
-			return params, fmt.Errorf("{{ .JsonKey }} value %v is not valid", {{ .Name }})
+			return params, fmt.Errorf("{{ .JsonKey }} value %v is invalid", {{ .Name }})
 
 	}
 	{{- end }}
+{{- end }}
+
+func ({{- .FirstField.ReceiverName }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+{{- range .Fields }}
+
+	// check {{ .Name }} field -> json key {{ .JsonKey }}
+{{- if .Optional }}
+	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
+		{{ .Name }} := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+
+		{{ template "check-required" . }}
+
+		{{ template "check-valid-values" . }}
+
+		params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+	}
+{{- else }}
+	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
+
+	{{ template "check-required" . }}
+
+	{{ template "check-valid-values" . }}
+
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 {{- end }}
 

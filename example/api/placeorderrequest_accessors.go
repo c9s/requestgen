@@ -53,64 +53,97 @@ func (p *PlaceOrderRequest) ComplexArg(complexArg ComplexArg) *PlaceOrderRequest
 
 func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+
+	// check clientOrderID field -> json key clientOid
 	if p.clientOrderID != nil {
 		clientOrderID := *p.clientOrderID
+
 		if len(clientOrderID) == 0 {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
+
 		params["clientOid"] = clientOrderID
 	}
+
+	// check symbol field -> json key symbol
 	symbol := p.symbol
+
 	if len(symbol) == 0 {
 		return params, fmt.Errorf("symbol is required, empty string given")
 	}
+
 	params["symbol"] = symbol
+
+	// check tag field -> json key tag
 	if p.tag != nil {
 		tag := *p.tag
+
 		params["tag"] = tag
 	}
+
+	// check side field -> json key side
 	side := p.side
+
 	if len(side) == 0 {
 		return params, fmt.Errorf("side is required, empty string given")
 	}
+
 	switch side {
 	case "buy", "sell":
 		params["side"] = side
 
 	default:
-		return params, fmt.Errorf("side value %v is not valid", side)
+		return params, fmt.Errorf("side value %v is invalid", side)
 
 	}
+
 	params["side"] = side
+
+	// check ordType field -> json key ordType
 	ordType := p.ordType
+
 	switch ordType {
 	case "limit", "market":
 		params["ordType"] = ordType
 
 	default:
-		return params, fmt.Errorf("ordType value %v is not valid", ordType)
+		return params, fmt.Errorf("ordType value %v is invalid", ordType)
 
 	}
+
 	params["ordType"] = ordType
+
+	// check size field -> json key size
 	size := p.size
+
 	params["size"] = size
+
+	// check price field -> json key price
 	if p.price != nil {
 		price := *p.price
+
 		params["price"] = price
 	}
+
+	// check timeInForce field -> json key timeInForce
 	if p.timeInForce != nil {
 		timeInForce := *p.timeInForce
+
 		switch timeInForce {
 		case "GTC", "GTT", "FOK":
 			params["timeInForce"] = timeInForce
 
 		default:
-			return params, fmt.Errorf("timeInForce value %v is not valid", timeInForce)
+			return params, fmt.Errorf("timeInForce value %v is invalid", timeInForce)
 
 		}
+
 		params["timeInForce"] = timeInForce
 	}
+
+	// check complexArg field -> json key complexArg
 	complexArg := p.complexArg
+
 	params["complexArg"] = complexArg
 	return params, nil
 }
