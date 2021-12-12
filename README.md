@@ -12,7 +12,9 @@ go get github.com/c9s/requestgen
 
 `requestgen` scans all the fields of the target struct, and generate setter methods and getParameters method.
 
-```
+```go
+package api
+
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
