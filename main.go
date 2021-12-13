@@ -159,6 +159,7 @@ type Generator struct {
 
 	// the collected fields
 	fields []Field
+	queryFields []Field
 }
 
 // addPackage adds a type checked Package and its syntax files to the generator.
@@ -292,6 +293,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			isTime := argType.String() == "time.Time"
 			required := paramTag.HasOption("required")
 			isMillisecondsTime := paramTag.HasOption("milliseconds")
+			isQuery := paramTag.HasOption("query")
 
 			if isTime {
 				g.importPackages["time"] = struct{}{}
@@ -349,8 +351,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			if !ok {
 				receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
 			}
-
-			g.fields = append(g.fields, Field{
+			f := Field{
 				Name:               field.Names[0].Name,
 				Type:               typeValue.Type,
 				ArgType:            argType,
@@ -370,10 +371,13 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				StructType:     structTV.Type.(*types.Struct),
 				ReceiverName:   receiverName,
 				File:           file,
-			})
-		} else {
-			for _, name := range field.Names {
-				_ = name
+			}
+
+			g.fields = append(g.fields, f)
+
+			// query parameters
+			if isQuery {
+				g.queryFields = append(g.queryFields, f)
 			}
 		}
 	}
@@ -568,12 +572,13 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+
 {{- range .Fields }}
 
 	// check {{ .Name }} field -> json key {{ .JsonKey }}
 {{- if .Optional }}
-	if {{ $.FirstField.ReceiverName }}.{{ .Name }} != nil {
-		{{ .Name }} := *{{- $.FirstField.ReceiverName }}.{{ .Name }}
+	if {{ $recv }}.{{ .Name }} != nil {
+		{{ .Name }} := *{{- $recv }}.{{ .Name }}
 
 		{{ template "check-required" . }}
 
@@ -590,7 +595,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 		{{- end }}
 	} {{- end }}
 {{- else }}
-	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
+	{{ .Name }} := {{- $recv }}.{{ .Name }}
 
 	{{ template "check-required" . }}
 
@@ -600,6 +605,8 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 {{- end }}
 
 {{- end }}
+
+
 	return params, nil
 }
 

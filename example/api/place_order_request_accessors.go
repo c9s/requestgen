@@ -172,6 +172,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// convert time.Time to milliseconds time
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	}
+
 	return params, nil
 }
 
