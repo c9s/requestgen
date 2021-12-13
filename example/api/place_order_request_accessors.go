@@ -3,6 +3,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"net/url"
@@ -60,7 +61,7 @@ func (p *PlaceOrderRequest) StartTime(startTime time.Time) *PlaceOrderRequest {
 	return p
 }
 
-func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
+func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check clientOrderID field -> json key clientOid
@@ -177,10 +178,10 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
-func (p *PlaceOrderRequest) getQuery() (url.Values, error) {
+func (p *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := p.getParameters()
+	params, err := p.GetParameters()
 	if err != nil {
 		return query, err
 	}
@@ -190,4 +191,13 @@ func (p *PlaceOrderRequest) getQuery() (url.Values, error) {
 	}
 
 	return query, nil
+}
+
+func (p *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
+	params, err := p.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
 }
