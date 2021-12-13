@@ -449,11 +449,7 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
-	usedPkgNames := []string{
-		"fmt",
-		"net/url",
-	}
-
+	var usedPkgNames []string
 	for n := range g.importPackages {
 		usedPkgNames = append(usedPkgNames, n)
 	}
@@ -531,8 +527,8 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
-
 {{ $recv := .FirstField.ReceiverName }}
+{{ $structType := .FirstField.StructName }}
 
 {{- define "check-required" }}
 {{- if .Required }}
@@ -570,7 +566,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 {{- end -}}
 {{- end }}
 
-func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParameters() (map[string]interface{}, error) {
+func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 {{- range .Fields }}
 
@@ -607,7 +603,7 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParameters() (map[string]i
 	return params, nil
 }
 
-func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParametersQuery() (url.Values, error) {
+func ({{- $recv }} * {{- $structType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
 	params, err := {{ $recv }}.GetParameters()
@@ -622,14 +618,16 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParametersQuery() (url.Val
 	return query, nil
 }
 
-`))
+func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
+	params, err := {{ $recv }}.GetParameters()
+	if err != nil {
+		return nil, err
+	}
 
-	/*
-		switch *parameterType {
-		 case "url":
-		 case "map":
-		}
-	*/
+	return json.Marshal(params)
+}
+
+`))
 
 	err = parameterFuncTemplate.Execute(&g.buf, struct {
 		FirstField Field
@@ -685,7 +683,11 @@ func main() {
 
 	g := Generator{
 		structTypeReceiverNames: map[string]string{},
-		importPackages:          map[string]struct{}{},
+		importPackages:          map[string]struct{}{
+			"fmt": {},
+			"net/url": {},
+			"encoding/json": {},
+		},
 	}
 
 	pkgs, err := parsePackage(args, tags)
