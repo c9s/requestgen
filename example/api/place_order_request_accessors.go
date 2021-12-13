@@ -72,10 +72,14 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
 
+		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	} else {
+
+		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
 
+		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	}
 
@@ -86,12 +90,14 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		return params, fmt.Errorf("symbol is required, empty string given")
 	}
 
+	// assign parameter of symbol
 	params["symbol"] = symbol
 
 	// check tag field -> json key tag
 	if p.tag != nil {
 		tag := *p.tag
 
+		// assign parameter of tag
 		params["tag"] = tag
 	}
 
@@ -111,6 +117,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	}
 
+	// assign parameter of side
 	params["side"] = side
 
 	// check ordType field -> json key ordType
@@ -125,17 +132,20 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	}
 
+	// assign parameter of ordType
 	params["ordType"] = ordType
 
 	// check size field -> json key size
 	size := p.size
 
+	// assign parameter of size
 	params["size"] = size
 
 	// check price field -> json key price
 	if p.price != nil {
 		price := *p.price
 
+		// assign parameter of price
 		params["price"] = price
 	}
 
@@ -152,23 +162,29 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		}
 
+		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
 	}
 
 	// check complexArg field -> json key complexArg
 	complexArg := p.complexArg
 
+	// assign parameter of complexArg
 	params["complexArg"] = complexArg
 
 	// check startTime field -> json key startTime
 	if p.startTime != nil {
 		startTime := *p.startTime
 
+		// assign parameter of startTime
 		// convert time.Time to milliseconds time
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
+
+		// assign default of startTime
 		startTime := time.Now()
 
+		// assign parameter of startTime
 		// convert time.Time to milliseconds time
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	}

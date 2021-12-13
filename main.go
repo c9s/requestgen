@@ -562,12 +562,24 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 {{- end }}
 
 {{- define "assign" }}
+	// assign parameter of {{ .Name }}
 {{- if and .IsTime .IsMillisecondsTime }}
 	// convert time.Time to milliseconds time
 	params[ "{{- .JsonKey -}}" ] = strconv.FormatInt({{ .Name }}.UnixNano()/int64(time.Millisecond), 10)
 {{- else }}
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 {{- end -}}
+{{- end }}
+
+{{- define "assign-default" }}
+	// assign default of {{ .Name }}
+	{{- if eq .DefaultValuer "now()" }}
+	{{ .Name }} := time.Now()
+	{{ template "assign" . }}
+	{{- else if eq .DefaultValuer "uuid()" }}
+	{{ .Name }} := uuid.New().String()
+	{{ template "assign" . }}
+	{{- end }}
 {{- end }}
 
 func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface{}, error) {
@@ -586,13 +598,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 
 		{{ template "assign" . }}
 	} {{- if .DefaultValuer }} else {
-		{{- if eq .DefaultValuer "now()" }}
-		{{ .Name }} := time.Now()
-		{{ template "assign" . }}
-		{{- else if eq .DefaultValuer "uuid()" }}
-		{{ .Name }} := uuid.New().String()
-		{{ template "assign" . }}
-		{{- end }}
+		{{ template "assign-default" . }}
 	} {{- end }}
 {{- else }}
 	{{ .Name }} := {{- $recv }}.{{ .Name }}
@@ -605,7 +611,6 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 {{- end }}
 
 {{- end }}
-
 
 	return params, nil
 }
