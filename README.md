@@ -53,6 +53,8 @@ err := req.Tag(..).
 	Do(ctx)
 ```
 
+See the [generated example](./example/api/place_order_request_accessors.go)
+
 Note that you need to implement Do() by yourself.
 
 # LICENSE
