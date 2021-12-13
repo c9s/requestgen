@@ -580,7 +580,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 		{{ template "check-valid-values" . }}
 
 		{{ template "assign" . }}
-	} else {
+	} {{- if .DefaultValuer }} else {
 		{{- if eq .DefaultValuer "now()" }}
 		{{ .Name }} := time.Now()
 		{{ template "assign" . }}
@@ -588,7 +588,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 		{{ .Name }} := uuid.New().String()
 		{{ template "assign" . }}
 		{{- end }}
-	}
+	} {{- end }}
 {{- else }}
 	{{ .Name }} := {{- $.FirstField.ReceiverName }}.{{ .Name }}
 

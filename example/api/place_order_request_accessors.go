@@ -93,7 +93,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		tag := *p.tag
 
 		params["tag"] = tag
-	} else {
 	}
 
 	// check side field -> json key side
@@ -138,7 +137,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		price := *p.price
 
 		params["price"] = price
-	} else {
 	}
 
 	// check timeInForce field -> json key timeInForce
@@ -155,7 +153,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		}
 
 		params["timeInForce"] = timeInForce
-	} else {
 	}
 
 	// check complexArg field -> json key complexArg
