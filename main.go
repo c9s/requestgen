@@ -570,7 +570,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 {{- end -}}
 {{- end }}
 
-func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]interface{}, error) {
+func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 {{- range .Fields }}
 
@@ -607,10 +607,10 @@ func ({{- $recv }} *{{ .FirstField.StructName -}}) getParameters() (map[string]i
 	return params, nil
 }
 
-func ({{- $recv }} *{{ .FirstField.StructName -}}) getQuery() (url.Values, error) {
+func ({{- $recv }} *{{ .FirstField.StructName -}}) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := {{ $recv }}.getParameters()
+	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
 		return query, err
 	}
