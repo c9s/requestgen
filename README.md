@@ -57,6 +57,10 @@ See the [generated example](./example/api/place_order_request_accessors.go)
 
 Note that you need to implement Do() by yourself.
 
+# See Also
+
+- callbackgen <https://github.com/c9s/callbackgen>
+
 # LICENSE
 
 MIT License
