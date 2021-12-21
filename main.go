@@ -823,8 +823,8 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports |
 			packages.NeedTypes | packages.NeedTypesSizes |
-			packages.NeedTypesInfo | packages.NeedFiles |
-			packages.NeedSyntax | packages.NeedTypesInfo,
+			packages.NeedSyntax | packages.NeedTypesInfo |
+			packages.NeedDeps,
 		// TODO: Need to think about constants in test files. Maybe write type_string_test.go
 		// in a separate pass? For later.
 		Tests:      false,
