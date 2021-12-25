@@ -298,7 +298,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 
 			if isTime {
 				g.importPackages["time"] = struct{}{}
-				if isMillisecondsTime {
+				if isMillisecondsTime || isSecondsTime {
 					g.importPackages["strconv"] = struct{}{}
 				}
 			}
