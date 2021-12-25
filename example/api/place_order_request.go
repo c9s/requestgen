@@ -1,6 +1,8 @@
 package api
 
-import "time"
+import (
+	"time"
+)
 
 type SideType string
 
@@ -35,7 +37,6 @@ const (
 type ComplexArg struct {
 	A, B int
 }
-
 
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {

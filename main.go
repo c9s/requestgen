@@ -78,7 +78,7 @@ type Field struct {
 
 	Default interface{}
 
-	IsMillisecondsTime bool
+	IsMillisecondsTime, IsSecondsTime bool
 
 	// SetterName is the method name of the setter
 	SetterName string
@@ -158,7 +158,7 @@ type Generator struct {
 	importPackages map[string]struct{}
 
 	// the collected fields
-	fields []Field
+	fields      []Field
 	queryFields []Field
 }
 
@@ -293,6 +293,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			isTime := argType.String() == "time.Time"
 			required := paramTag.HasOption("required")
 			isMillisecondsTime := paramTag.HasOption("milliseconds")
+			isSecondsTime := paramTag.HasOption("seconds")
 			isQuery := paramTag.HasOption("query")
 
 			if isTime {
@@ -302,8 +303,8 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				}
 			}
 
-			if !isTime && isMillisecondsTime {
-				log.Errorf("milliseconds option is not valid for non time.Time type field")
+			if !isTime && (isMillisecondsTime || isSecondsTime) {
+				log.Errorf("milliseconds/seconds option is not valid for non time.Time type field")
 				return
 			}
 
@@ -360,6 +361,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				IsInt:              isInt,
 				IsTime:             isTime,
 				IsMillisecondsTime: isMillisecondsTime,
+				IsSecondsTime:      isSecondsTime,
 				JsonKey:            jsonKey,
 				Optional:           optional,
 				Required:           required,
@@ -564,8 +566,11 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 {{- define "assign" }}
 	// assign parameter of {{ .Name }}
 {{- if and .IsTime .IsMillisecondsTime }}
-	// convert time.Time to milliseconds time
+	// convert time.Time to milliseconds time stamp
 	params[ "{{- .JsonKey -}}" ] = strconv.FormatInt({{ .Name }}.UnixNano()/int64(time.Millisecond), 10)
+{{- else if and .IsTime .IsSecondsTime }}
+	// convert time.Time to seconds time stamp
+	params[ "{{- .JsonKey -}}" ] = strconv.FormatInt({{ .Name }}.Unix(), 10)
 {{- else }}
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 {{- end -}}
@@ -695,9 +700,9 @@ func main() {
 
 	g := Generator{
 		structTypeReceiverNames: map[string]string{},
-		importPackages:          map[string]struct{}{
-			"fmt": {},
-			"net/url": {},
+		importPackages: map[string]struct{}{
+			"fmt":           {},
+			"net/url":       {},
 			"encoding/json": {},
 		},
 	}
