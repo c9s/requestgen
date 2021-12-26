@@ -375,11 +375,11 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 				File:           file,
 			}
 
-			g.fields = append(g.fields, f)
-
 			// query parameters
 			if isQuery {
 				g.queryFields = append(g.queryFields, f)
+			} else {
+				g.fields = append(g.fields, f)
 			}
 		}
 	}
