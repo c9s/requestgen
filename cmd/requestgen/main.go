@@ -38,6 +38,7 @@ import (
 
 var (
 	typeNamesStr  = flag.String("type", "", "comma-separated list of type names; must be set")
+	apiMethodStr  = flag.String("X", "GET", "api method: GET, POST, PUT, DELETE")
 	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
 	debug         = flag.Bool("debug", false, "debug mode")
 	outputStdout  = flag.Bool("stdout", false, "output generated content to the stdout")
@@ -157,6 +158,12 @@ type Generator struct {
 
 	importPackages map[string]struct{}
 
+	// apiClientField if the request defined the client field with APIClient,
+	// it means we can generate the Do() method
+	apiClientField *string
+	structType     types.Type
+	receiverName   string
+
 	// the collected fields
 	fields      []Field
 	queryFields []Field
@@ -203,16 +210,39 @@ func (g *Generator) registerReceiverNameOfType(decl *ast.FuncDecl) bool {
 		return true
 	}
 
+	// use ident to look up type
+	// typeDef := g.pkg.pkg.TypesInfo.Defs[receiver.Names[0]]
+
 	// there are 2 types of receiver type value (named type or pointer type)
 	// here we record the type name -> receiver name mapping
 	switch receiverType := receiverTypeValue.Type.(type) {
 	case *types.Named:
 		g.structTypeReceiverNames[receiverType.String()] = receiver.Names[0].String()
+		g.receiverName = receiver.Names[0].String()
+		g.structType = receiverTypeValue.Type
 
 	case *types.Pointer:
 		g.structTypeReceiverNames[receiverType.Elem().String()] = receiver.Names[0].String()
+		g.receiverName = receiver.Names[0].String()
+		g.structType = receiverTypeValue.Type
 	}
+
 	return true
+}
+
+func (g *Generator) checkClientInterface(field *ast.Field) {
+	typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
+	if !ok {
+		return
+	}
+
+	// github.com/c9s/requestgen.APIClient
+	if typeValue.Type.String() == "github.com/c9s/requestgen.APIClient" {
+		log.Debugf("found APIClient field %v -> %+v", field.Names, typeValue.Type.String())
+
+		g.apiClientField = &field.Names[0].Name
+		g.importPackages["context"] = struct{}{}
+	}
 }
 
 func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structType *ast.StructType) {
@@ -225,11 +255,17 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 
 	// iterate the field list (by syntax)
 	for _, field := range structType.Fields.List {
-
 		// each struct field AST could have multiple names in one line
 		if len(field.Names) > 1 {
 			continue
 		}
+
+		g.checkClientInterface(field)
+
+		if field.Tag == nil {
+			continue
+		}
+
 		var optional = false
 		var name = field.Names[0].Name
 		var jsonKey = name
@@ -248,10 +284,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			ss[0] = strings.Title(ss[0])
 			setterName = strings.Join(ss, "")
 			jsonKey = name
-		}
-
-		if field.Tag == nil {
-			continue
 		}
 
 		tag := field.Tag.Value
@@ -334,6 +366,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 		receiverName, ok := g.structTypeReceiverNames[fullTypeName]
 		if !ok {
 			receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
+			g.receiverName = receiverName
 		}
 		f := Field{
 			Name:               field.Names[0].Name,
@@ -520,12 +553,13 @@ func (g *Generator) generate(typeName string) {
 		types.TypeString(field.ArgType, qf)
 	}
 
-	type TemplateArgs struct {
+	var funcMap = templateFuncs(qf)
+
+	type accessorTemplateArgs struct {
 		Field     Field
 		Qualifier types.Qualifier
 	}
 
-	var funcMap = templateFuncs(qf)
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
 func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) *{{ .Field.StructName -}} {
@@ -546,7 +580,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	}
 
 	for _, field := range g.queryFields {
-		err := setterFuncTemplate.Execute(&g.buf, TemplateArgs{
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:     field,
 			Qualifier: qf,
 		})
@@ -556,7 +590,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	}
 
 	for _, field := range g.fields {
-		err := setterFuncTemplate.Execute(&g.buf, TemplateArgs{
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:     field,
 			Qualifier: qf,
 		})
@@ -730,13 +764,69 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 		QueryFields []Field
 		Qualifier   types.Qualifier
 	}{
-		FirstField: g.fields[0],
-		Fields:     g.fields,
+		FirstField:  g.fields[0],
+		Fields:      g.fields,
 		QueryFields: g.queryFields,
-		Qualifier:  qf,
+		Qualifier:   qf,
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if g.apiClientField != nil {
+		var doFuncTemplate = template.Must(
+			template.New("do").Funcs(funcMap).Parse(`
+func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) (interface{}, error) {
+	{{ $recv := .ReceiverName }}
+
+{{- if ne .ApiMethod "GET" }}
+	params, err := {{ $recv }}.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+{{- else }}
+	var params interface{}
+{{- end }}
+
+	query, err := {{ $recv }}.GetQueryParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := {{ $recv }}.{{ .ApiClientField }}.NewRequest("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := {{ $recv }}.{{ .ApiClientField }}.SendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse interface{}
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	return apiResponse, nil
+}
+`))
+		err = doFuncTemplate.Execute(&g.buf, struct {
+			StructType     types.Type
+			ReceiverName   string
+			ApiClientField string
+			ApiMethod      string
+			ApiUrl         string
+		}{
+			StructType:     g.structType,
+			ReceiverName:   g.receiverName,
+			ApiClientField: *g.apiClientField,
+			ApiMethod:      *apiMethodStr,
+			ApiUrl:         "/api/v1/bullet-public",
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 }

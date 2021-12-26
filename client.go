@@ -11,7 +11,7 @@ type APIClient interface {
 	NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
 	// NewRequest builds up the http request for public endpoints
-	NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error)
+	NewRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
 	// SendRequest sends the request object to the api gateway
 	SendRequest(req *http.Request) (*Response, error)
