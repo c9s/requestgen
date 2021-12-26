@@ -37,8 +37,10 @@ import (
 )
 
 var (
-	typeNamesStr  = flag.String("type", "", "comma-separated list of type names; must be set")
-	apiMethodStr  = flag.String("X", "GET", "api method: GET, POST, PUT, DELETE")
+	typeNamesStr = flag.String("type", "", "comma-separated list of type names; must be set")
+	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
+	apiUrlStr    = flag.String("url", "", "api url endpoint")
+
 	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
 	debug         = flag.Bool("debug", false, "debug mode")
 	outputStdout  = flag.Bool("stdout", false, "output generated content to the stdout")
@@ -773,7 +775,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 		log.Fatal(err)
 	}
 
-	if g.apiClientField != nil {
+	if g.apiClientField != nil && *apiUrlStr != "" {
 		var doFuncTemplate = template.Must(
 			template.New("do").Funcs(funcMap).Parse(`
 func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) (interface{}, error) {
@@ -822,7 +824,7 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 			ReceiverName:   g.receiverName,
 			ApiClientField: *g.apiClientField,
 			ApiMethod:      *apiMethodStr,
-			ApiUrl:         "/api/v1/bullet-public",
+			ApiUrl:         *apiUrlStr,
 		})
 		if err != nil {
 			log.Fatal(err)
