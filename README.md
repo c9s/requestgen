@@ -5,7 +5,7 @@ requestgen generates the cascade call for your request object
 ## Installation
 
 ```
-go get github.com/c9s/requestgen
+go get github.com/c9s/requestgen/cmd/requestgen
 ```
 
 ## Usage

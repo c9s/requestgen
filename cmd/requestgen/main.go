@@ -227,173 +227,194 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 	for _, field := range structType.Fields.List {
 
 		// each struct field AST could have multiple names in one line
-		if len(field.Names) == 1 {
-			var optional = false
-			var name = field.Names[0].Name
-			var jsonKey = name
+		if len(field.Names) > 1 {
+			continue
+		}
+		var optional = false
+		var name = field.Names[0].Name
+		var jsonKey = name
 
-			var isExported = field.Names[0].IsExported()
-			var setterName string
+		var isExported = field.Names[0].IsExported()
+		var setterName string
 
-			// convert field name to the json key as the default json key
-			var ss = camelcase.Split(name)
+		// convert field name to the json key as the default json key
+		var ss = camelcase.Split(name)
 
-			if isExported {
-				ss[0] = strings.ToLower(ss[0])
-				setterName = "Set" + name
-				jsonKey = strings.Join(ss, "")
-			} else {
-				ss[0] = strings.Title(ss[0])
-				setterName = strings.Join(ss, "")
-				jsonKey = name
+		if isExported {
+			ss[0] = strings.ToLower(ss[0])
+			setterName = "Set" + name
+			jsonKey = strings.Join(ss, "")
+		} else {
+			ss[0] = strings.Title(ss[0])
+			setterName = strings.Join(ss, "")
+			jsonKey = name
+		}
+
+		if field.Tag == nil {
+			continue
+		}
+
+		tag := field.Tag.Value
+		tag = strings.Trim(tag, "`")
+		tags, err := structtag.Parse(tag)
+		if err != nil {
+			log.WithError(err).Errorf("struct tag parse error, tag: %s", tag)
+			continue
+		}
+
+		paramTag, err := tags.Get("param")
+		if err != nil {
+			continue
+		}
+
+		if len(paramTag.Name) > 0 {
+			jsonKey = paramTag.Name
+		}
+
+		// The field.Type is an ast Type, we can't use that.
+		// So we need to find the abstract type information from the types info
+		typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
+		if !ok {
+			continue
+		}
+
+		var argType types.Type
+		var argKind types.BasicKind
+
+		switch a := typeValue.Type.(type) {
+		case *types.Pointer:
+			optional = true
+			argType = a.Elem()
+		default:
+			argType = a
+		}
+
+		argKind = getBasicKind(argType)
+		isString := isTypeString(argType)
+		isInt := isTypeInt(argType)
+		isTime := argType.String() == "time.Time"
+		required := paramTag.HasOption("required")
+		isMillisecondsTime := paramTag.HasOption("milliseconds")
+		isSecondsTime := paramTag.HasOption("seconds")
+		isQuery := paramTag.HasOption("query")
+
+		if isTime {
+			g.importPackages["time"] = struct{}{}
+			if isMillisecondsTime || isSecondsTime {
+				g.importPackages["strconv"] = struct{}{}
 			}
+		}
 
-			if field.Tag == nil {
-				continue
-			}
+		if !isTime && (isMillisecondsTime || isSecondsTime) {
+			log.Errorf("milliseconds/seconds option is not valid for non time.Time type field")
+			return
+		}
 
-			tag := field.Tag.Value
-			tag = strings.Trim(tag, "`")
-			tags, err := structtag.Parse(tag)
-			if err != nil {
-				log.WithError(err).Errorf("struct tag parse error, tag: %s", tag)
-				continue
-			}
-
-			paramTag, err := tags.Get("param")
-			if err != nil {
-				continue
-			}
-
-			if len(paramTag.Name) > 0 {
-				jsonKey = paramTag.Name
-			}
-
-			// The field.Type is an ast Type, we can't use that.
-			// So we need to find the abstract type information from the types info
-			typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
-			if !ok {
-				continue
-			}
-
-			var argType types.Type
-			var argKind types.BasicKind
-
-			switch a := typeValue.Type.(type) {
-			case *types.Pointer:
-				optional = true
-				argType = a.Elem()
-			default:
-				argType = a
-			}
-
-			argKind = getBasicKind(argType)
-			isString := isTypeString(argType)
-			isInt := isTypeInt(argType)
-			isTime := argType.String() == "time.Time"
-			required := paramTag.HasOption("required")
-			isMillisecondsTime := paramTag.HasOption("milliseconds")
-			isSecondsTime := paramTag.HasOption("seconds")
-			isQuery := paramTag.HasOption("query")
-
-			if isTime {
+		var defaultValuer string
+		defaultTag, _ := tags.Get("defaultValuer")
+		if defaultTag != nil {
+			defaultValuer = defaultTag.Value()
+			switch defaultValuer {
+			case "now()":
 				g.importPackages["time"] = struct{}{}
-				if isMillisecondsTime || isSecondsTime {
-					g.importPackages["strconv"] = struct{}{}
-				}
+			case "uuid()":
+				g.importPackages["github.com/google/uuid"] = struct{}{}
+
 			}
+		}
 
-			if !isTime && (isMillisecondsTime || isSecondsTime) {
-				log.Errorf("milliseconds/seconds option is not valid for non time.Time type field")
-				return
-			}
+		fieldName := field.Names[0].Name
+		debugUnderlying(fieldName, argType)
 
-			var defaultValuer string
-			defaultTag, _ := tags.Get("defaultValuer")
-			if defaultTag != nil {
-				defaultValuer = defaultTag.Value()
-				switch defaultValuer {
-				case "now()":
-					g.importPackages["time"] = struct{}{}
-				case "uuid()":
-					g.importPackages["github.com/google/uuid"] = struct{}{}
+		validValues, err := parseValidValuesTag(tags, fieldName, argKind)
+		if err != nil {
+			return
+		}
 
-				}
-			}
+		receiverName, ok := g.structTypeReceiverNames[fullTypeName]
+		if !ok {
+			receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
+		}
+		f := Field{
+			Name:               field.Names[0].Name,
+			Type:               typeValue.Type,
+			ArgType:            argType,
+			SetterName:         setterName,
+			IsString:           isString,
+			IsInt:              isInt,
+			IsTime:             isTime,
+			IsMillisecondsTime: isMillisecondsTime,
+			IsSecondsTime:      isSecondsTime,
+			JsonKey:            jsonKey,
+			Optional:           optional,
+			Required:           required,
+			ValidValues:        validValues,
+			DefaultValuer:      defaultValuer,
 
-			fieldName := field.Names[0].Name
-			debugUnderlying(fieldName, argType)
+			StructName:     typeSpec.Name.String(),
+			StructTypeName: fullTypeName,
+			StructType:     structTV.Type.(*types.Struct),
+			ReceiverName:   receiverName,
+			File:           file,
+		}
 
-			var validValues interface{}
-			validValuesTag, _ := tags.Get("validValues")
-			if validValuesTag != nil {
-				validValueList := strings.Split(validValuesTag.Value(), ",")
-
-				log.Debugf("%s found valid values: %v", fieldName, validValueList)
-
-				switch argKind {
-				case types.Int, types.Int64, types.Int32:
-					var slice []int
-					for _, s := range validValueList {
-						i, err := strconv.Atoi(s)
-						if err != nil {
-							return
-						}
-						slice = append(slice, i)
-					}
-
-				case types.String:
-					validValues = validValueList
-
-				}
-			}
-
-			receiverName, ok := g.structTypeReceiverNames[fullTypeName]
-			if !ok {
-				receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
-			}
-			f := Field{
-				Name:               field.Names[0].Name,
-				Type:               typeValue.Type,
-				ArgType:            argType,
-				SetterName:         setterName,
-				IsString:           isString,
-				IsInt:              isInt,
-				IsTime:             isTime,
-				IsMillisecondsTime: isMillisecondsTime,
-				IsSecondsTime:      isSecondsTime,
-				JsonKey:            jsonKey,
-				Optional:           optional,
-				Required:           required,
-				ValidValues:        validValues,
-				DefaultValuer:      defaultValuer,
-
-				StructName:     typeSpec.Name.String(),
-				StructTypeName: fullTypeName,
-				StructType:     structTV.Type.(*types.Struct),
-				ReceiverName:   receiverName,
-				File:           file,
-			}
-
-			// query parameters
-			if isQuery {
-				g.queryFields = append(g.queryFields, f)
-			} else {
-				g.fields = append(g.fields, f)
-			}
+		// query parameters
+		if isQuery {
+			g.queryFields = append(g.queryFields, f)
+		} else {
+			g.fields = append(g.fields, f)
 		}
 	}
 }
 
-// nodeParser returns an ast node iterator function for iterating the ast nodes
-func (g *Generator) nodeParser(typeName string, file *File) func(ast.Node) bool {
+func parseValidValuesTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {
+	validValuesTag, _ := tags.Get("validValues")
+	if validValuesTag == nil {
+		return nil, nil
+	}
+
+	var validValues interface{}
+	validValueList := strings.Split(validValuesTag.Value(), ",")
+
+	log.Debugf("%s found valid values: %v", fieldName, validValueList)
+
+	switch argKind {
+	case types.Int, types.Int64, types.Int32:
+		var slice []int
+		for _, s := range validValueList {
+			i, err := strconv.Atoi(s)
+			if err != nil {
+				return nil, err
+			}
+
+			slice = append(slice, i)
+		}
+
+	case types.String:
+		validValues = validValueList
+
+	}
+
+	return validValues, nil
+}
+
+func (g *Generator) receiverNameWalker(typeName string, file *File) func(ast.Node) bool {
 	return func(node ast.Node) bool {
 		switch decl := node.(type) {
-		case *ast.ImportSpec:
-
 		case *ast.FuncDecl:
 			// TODO: should pull this out for the first round parsing, or we might not be able to find the receiver name
 			return g.registerReceiverNameOfType(decl)
+		}
+
+		return true
+	}
+}
+
+// requestStructWalker returns an ast node iterator function for iterating the ast nodes
+func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.Node) bool {
+	return func(node ast.Node) bool {
+		switch decl := node.(type) {
+		case *ast.ImportSpec:
 
 		case *ast.GenDecl:
 			if decl.Tok != token.TYPE {
@@ -439,12 +460,17 @@ func (g *Generator) nodeParser(typeName string, file *File) func(ast.Node) bool 
 func (g *Generator) generate(typeName string) {
 	// collect the fields and types
 	for _, file := range g.pkg.files {
-		// Set the state for this run of the walker.
 		if file.file == nil {
 			continue
 		}
+		ast.Inspect(file.file, g.receiverNameWalker(typeName, file))
+	}
 
-		ast.Inspect(file.file, g.nodeParser(typeName, file))
+	for _, file := range g.pkg.files {
+		if file.file == nil {
+			continue
+		}
+		ast.Inspect(file.file, g.requestStructWalker(typeName, file))
 	}
 
 	if len(g.fields) == 0 {
@@ -519,6 +545,16 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 		g.Newline()
 	}
 
+	for _, field := range g.queryFields {
+		err := setterFuncTemplate.Execute(&g.buf, TemplateArgs{
+			Field:     field,
+			Qualifier: qf,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	for _, field := range g.fields {
 		err := setterFuncTemplate.Execute(&g.buf, TemplateArgs{
 			Field:     field,
@@ -587,11 +623,51 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	{{- end }}
 {{- end }}
 
+
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func ({{- $recv }} * {{- $structType -}} ) GetQueryParameters() (url.Values, error) {
+	var params = map[string]interface{}{}
+
+{{- range .QueryFields }}
+	// check {{ .Name }} field -> json key {{ .JsonKey }}
+{{- if .Optional }}
+	if {{ $recv }}.{{ .Name }} != nil {
+		{{ .Name }} := *{{- $recv }}.{{ .Name }}
+
+		{{ template "check-required" . }}
+
+		{{ template "check-valid-values" . }}
+
+		{{ template "assign" . }}
+	} {{- if .DefaultValuer }} else {
+		{{ template "assign-default" . }}
+	} {{- end }}
+{{- else }}
+	{{ .Name }} := {{- $recv }}.{{ .Name }}
+
+	{{ template "check-required" . }}
+
+	{{ template "check-valid-values" . }}
+
+	{{ template "assign" . }}
+{{- end }}
+
+{{- end }}
+
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+
+// GetParameters builds and checks the parameters and return the result in a map object
 func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 {{- range .Fields }}
-
 	// check {{ .Name }} field -> json key {{ .JsonKey }}
 {{- if .Optional }}
 	if {{ $recv }}.{{ .Name }} != nil {
@@ -620,6 +696,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 	return params, nil
 }
 
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
 func ({{- $recv }} * {{- $structType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
@@ -635,6 +712,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersQuery() (url.Values, err
 	return query, nil
 }
 
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
 func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
@@ -647,12 +725,14 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 `))
 
 	err = parameterFuncTemplate.Execute(&g.buf, struct {
-		FirstField Field
-		Fields     []Field
-		Qualifier  types.Qualifier
+		FirstField  Field
+		Fields      []Field
+		QueryFields []Field
+		Qualifier   types.Qualifier
 	}{
 		FirstField: g.fields[0],
 		Fields:     g.fields,
+		QueryFields: g.queryFields,
 		Qualifier:  qf,
 	})
 	if err != nil {

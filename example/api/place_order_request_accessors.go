@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+func (p *PlaceOrderRequest) Page(page int64) *PlaceOrderRequest {
+	p.page = &page
+	return p
+}
+
 func (p *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
 	p.clientOrderID = &clientOrderID
 	return p
@@ -61,9 +66,28 @@ func (p *PlaceOrderRequest) StartTime(startTime time.Time) *PlaceOrderRequest {
 	return p
 }
 
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (p *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
+	var params = map[string]interface{}{}
+	// check page field -> json key page
+	if p.page != nil {
+		page := *p.page
+
+		// assign parameter of page
+		params["page"] = page
+	}
+
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
 func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-
 	// check clientOrderID field -> json key clientOid
 	if p.clientOrderID != nil {
 		clientOrderID := *p.clientOrderID
@@ -82,7 +106,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	}
-
 	// check symbol field -> json key symbol
 	symbol := p.symbol
 
@@ -92,7 +115,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of symbol
 	params["symbol"] = symbol
-
 	// check tag field -> json key tag
 	if p.tag != nil {
 		tag := *p.tag
@@ -100,7 +122,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of tag
 		params["tag"] = tag
 	}
-
 	// check side field -> json key side
 	side := p.side
 
@@ -119,7 +140,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of side
 	params["side"] = side
-
 	// check ordType field -> json key ordType
 	ordType := p.ordType
 
@@ -134,13 +154,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of ordType
 	params["ordType"] = ordType
-
 	// check size field -> json key size
 	size := p.size
 
 	// assign parameter of size
 	params["size"] = size
-
 	// check price field -> json key price
 	if p.price != nil {
 		price := *p.price
@@ -148,7 +166,6 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of price
 		params["price"] = price
 	}
-
 	// check timeInForce field -> json key timeInForce
 	if p.timeInForce != nil {
 		timeInForce := *p.timeInForce
@@ -165,19 +182,17 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
 	}
-
 	// check complexArg field -> json key complexArg
 	complexArg := p.complexArg
 
 	// assign parameter of complexArg
 	params["complexArg"] = complexArg
-
 	// check startTime field -> json key startTime
 	if p.startTime != nil {
 		startTime := *p.startTime
 
 		// assign parameter of startTime
-		// convert time.Time to milliseconds time
+		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 
@@ -185,13 +200,14 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		startTime := time.Now()
 
 		// assign parameter of startTime
-		// convert time.Time to milliseconds time
+		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	}
 
 	return params, nil
 }
 
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
 func (p *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
@@ -207,6 +223,7 @@ func (p *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	return query, nil
 }
 
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
 func (p *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
 	params, err := p.GetParameters()
 	if err != nil {
