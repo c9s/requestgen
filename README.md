@@ -86,6 +86,7 @@ type APIClient interface {
 }
 ```
 
+See an example implementation of the APIClient interface. [Code](./example/api/client.go)
 
 # See Also
 
