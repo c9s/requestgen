@@ -86,7 +86,7 @@ type APIClient interface {
 }
 ```
 
-See an example implementation of the APIClient interface. [Code](./example/api/client.go)
+See a real example implementation of the APIClient interface. [kucoin exchange client](./example/api/client.go)
 
 # See Also
 
