@@ -70,7 +70,7 @@ See the [generated example](./example/api/place_order_request_accessors.go)
 
 ## APIClient
 
-You can implement your own http API client with the following interface:
+You can implement your own http API client struct that satisfies the following interface (defined in `requestgen.APIClient`)
 
 ```
 // APIClient defines the request builder method and request method for the API service
