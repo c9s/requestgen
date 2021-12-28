@@ -169,7 +169,10 @@ type Generator struct {
 	receiverName   string
 
 	// the collected fields
-	fields      []Field
+	// fields is for post body
+	fields []Field
+
+	// queryFields means query string
 	queryFields []Field
 }
 
@@ -787,13 +790,18 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 		return nil, err
 	}
 {{- else }}
+  // empty params for GET operation
 	var params interface{}
 {{- end }}
 
+{{- if .HasQueryParameters }}
 	query, err := {{ $recv }}.GetQueryParameters()
 	if err != nil {
 		return nil, err
 	}
+{{- else }}
+  query := url.Values{}
+{{- end }}
 
 	req, err := {{ $recv }}.{{ .ApiClientField }}.NewRequest("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
 	if err != nil {
@@ -820,6 +828,7 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 			ApiMethod        string
 			ApiUrl           string
 			ResponseTypeName string
+			HasQueryParameters bool
 		}{
 			StructType:       g.structType,
 			ReceiverName:     g.receiverName,
@@ -827,6 +836,7 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 			ApiMethod:        *apiMethodStr,
 			ApiUrl:           *apiUrlStr,
 			ResponseTypeName: *responseType,
+			HasQueryParameters:    len(g.queryFields) > 0,
 		})
 		if err != nil {
 			log.Fatal(err)
