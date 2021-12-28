@@ -68,6 +68,50 @@ err := req.Tag(..).
 
 See the [generated example](./example/api/place_order_request_accessors.go)
 
+## Command Options
+
+`-responseType [responseType]`
+
+When responseType is not given, `interface{}` will be used for decoding the response content from the API server.
+
+For example:
+
+```
+type Response struct {
+	Code    string          `json:"code"`
+	Message string          `json:"msg"`
+	CurrentPage int `json:"currentPage"`
+	PageSize    int `json:"pageSize"`
+	TotalNum    int `json:"totalNum"`
+	TotalPage   int `json:"totalPage"`
+	Orders      []Orders `json:"orders"`
+}
+```
+
+`-responseDataField [dataField]`
+
+When `dataField` is given, it means your data is inside the `responseType`, the field name is where you want to extract the data from.
+Be sure to define `dataField` as a `json.RawMessage` so that the generated code can handle the decoding separately.
+
+For example:
+
+```
+type Response struct {
+	Code    string          `json:"code"`
+	Message string          `json:"msg"`
+	CurrentPage int `json:"currentPage"`
+	PageSize    int `json:"pageSize"`
+	TotalNum    int `json:"totalNum"`
+	TotalPage   int `json:"totalPage"`
+	Data        json.RawMessage `json:"data"`
+}
+```
+
+`-responseDataType [dataType]` 
+
+When `dataType` is given, it means your data is inside the `responseType`. the raw json message will be decoded with this given type.
+
+
 ## APIClient
 
 You can implement your own http API client struct that satisfies the following interface (defined in `requestgen.APIClient`)
