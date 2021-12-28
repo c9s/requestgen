@@ -604,7 +604,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
-{{ $recv := .FirstField.ReceiverName }}
+{{ $recv := .ReceiverName }}
 {{ $structType := .FirstField.StructName }}
 
 {{- define "check-required" }}
@@ -658,9 +658,8 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	{{- end }}
 {{- end }}
 
-
 // GetQueryParameters builds and checks the query parameters and returns url.Values
-func ({{- $recv }} * {{- $structType -}} ) GetQueryParameters() (url.Values, error) {
+func ({{- $recv }} {{- typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 {{- range .QueryFields }}
@@ -699,7 +698,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetQueryParameters() (url.Values, err
 
 
 // GetParameters builds and checks the parameters and return the result in a map object
-func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface{}, error) {
+func ({{- $recv }} {{- typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 {{- range .Fields }}
@@ -732,7 +731,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParameters() (map[string]interface
 }
 
 // GetParametersQuery converts the parameters from GetParameters into the url.Values format
-func ({{- $recv }} * {{- $structType -}} ) GetParametersQuery() (url.Values, error) {
+func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
 	params, err := {{ $recv }}.GetParameters()
@@ -748,7 +747,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersQuery() (url.Values, err
 }
 
 // GetParametersJSON converts the parameters from GetParameters into the JSON format
-func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
+func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersJSON() ([]byte, error) {
 	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
 		return nil, err
@@ -761,15 +760,19 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 
 	if len(g.fields) > 0 {
 		err = parameterFuncTemplate.Execute(&g.buf, struct {
-			FirstField  Field
-			Fields      []Field
-			QueryFields []Field
-			Qualifier   types.Qualifier
+			StructType   types.Type
+			ReceiverName string
+			FirstField   Field
+			Fields       []Field
+			QueryFields  []Field
+			Qualifier    types.Qualifier
 		}{
-			FirstField:  g.fields[0],
-			Fields:      g.fields,
-			QueryFields: g.queryFields,
-			Qualifier:   qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
+			FirstField:   g.fields[0],
+			Fields:       g.fields,
+			QueryFields:  g.queryFields,
+			Qualifier:    qf,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -815,18 +818,18 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 }
 `))
 		err = doFuncTemplate.Execute(&g.buf, struct {
-			StructType     types.Type
-			ReceiverName   string
-			ApiClientField string
-			ApiMethod      string
-			ApiUrl         string
-			ResponseTypeName   string
+			StructType       types.Type
+			ReceiverName     string
+			ApiClientField   string
+			ApiMethod        string
+			ApiUrl           string
+			ResponseTypeName string
 		}{
-			StructType:     g.structType,
-			ReceiverName:   g.receiverName,
-			ApiClientField: *g.apiClientField,
-			ApiMethod:      *apiMethodStr,
-			ApiUrl:         *apiUrlStr,
+			StructType:       g.structType,
+			ReceiverName:     g.receiverName,
+			ApiClientField:   *g.apiClientField,
+			ApiMethod:        *apiMethodStr,
+			ApiUrl:           *apiUrlStr,
 			ResponseTypeName: *responseType,
 		})
 		if err != nil {
@@ -970,7 +973,7 @@ func typeTupleString(tup *types.Tuple, variadic bool, qf types.Qualifier) string
 
 func templateFuncs(qf types.Qualifier) template.FuncMap {
 	return template.FuncMap{
-		"typeReference": func(a string) string  {
+		"typeReference": func(a string) string {
 			if a == "interface{}" {
 				return a
 			}
