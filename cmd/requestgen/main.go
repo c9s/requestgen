@@ -572,8 +572,15 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
-		var doFuncTemplate = template.Must(
-			template.New("do").Funcs(funcMap).Parse(`
+		if err := g.generateDoMethod(funcMap) ; err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
+	var doFuncTemplate = template.Must(
+		template.New("do").Funcs(funcMap).Parse(`
 func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
 	{{ $recv := .ReceiverName }}
 
@@ -614,28 +621,25 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	return &apiResponse, nil
 }
 `))
-		err = doFuncTemplate.Execute(&g.buf, struct {
-			StructType         types.Type
-			ReceiverName       string
-			ApiClientField     string
-			ApiMethod          string
-			ApiUrl             string
-			ResponseTypeName   string
-			HasQueryParameters bool
-		}{
-			StructType:         g.structType,
-			ReceiverName:       g.receiverName,
-			ApiClientField:     *g.apiClientField,
-			ApiMethod:          *apiMethodStr,
-			ApiUrl:             *apiUrlStr,
-			ResponseTypeName:   *responseType,
-			HasQueryParameters: len(g.queryFields) > 0,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	err := doFuncTemplate.Execute(&g.buf, struct {
+		StructType         types.Type
+		ReceiverName       string
+		ApiClientField     string
+		ApiMethod          string
+		ApiUrl             string
+		ResponseTypeName   string
+		HasQueryParameters bool
+	}{
+		StructType:         g.structType,
+		ReceiverName:       g.receiverName,
+		ApiClientField:     *g.apiClientField,
+		ApiMethod:          *apiMethodStr,
+		ApiUrl:             *apiUrlStr,
+		ResponseTypeName:   *responseType,
+		HasQueryParameters: len(g.queryFields) > 0,
+	})
 
+	return err
 }
 
 func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(other *types.Package) string) error {

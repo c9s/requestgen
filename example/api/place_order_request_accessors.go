@@ -234,10 +234,10 @@ func (p *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
 	return json.Marshal(params)
 }
 
-func (p PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
+func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 
+	// empty params for GET operation
 	var params interface{}
-
 	query, err := p.GetQueryParameters()
 	if err != nil {
 		return nil, err
