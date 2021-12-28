@@ -258,5 +258,5 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	return apiResponse, nil
+	return &apiResponse, nil
 }

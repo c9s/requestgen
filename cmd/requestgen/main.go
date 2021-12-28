@@ -777,7 +777,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		var doFuncTemplate = template.Must(
 			template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) (*{{ .ResponseTypeName }}, error) {
+func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
 	{{ $recv := .ReceiverName }}
 
 {{- if ne .ApiMethod "GET" }}
@@ -968,6 +968,13 @@ func typeTupleString(tup *types.Tuple, variadic bool, qf types.Qualifier) string
 
 func templateFuncs(qf types.Qualifier) template.FuncMap {
 	return template.FuncMap{
+		"typeReference": func(a string) string  {
+			if a == "interface{}" {
+				return a
+			}
+
+			return "*" + a
+		},
 		"camelCase": func(a string) interface{} {
 			return strings.ToLower(string(a[0])) + string(a[1:])
 		},
