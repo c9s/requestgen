@@ -37,15 +37,18 @@ import (
 )
 
 var (
+	debug     = flag.Bool("debug", false, "debug mode")
+	buildTags = flag.String("tags", "", "comma-separated list of build tags to apply")
+
 	typeNamesStr = flag.String("type", "", "comma-separated list of type names; must be set")
 	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
 	apiUrlStr    = flag.String("url", "", "api url endpoint")
 
 	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
-	debug         = flag.Bool("debug", false, "debug mode")
-	outputStdout  = flag.Bool("stdout", false, "output generated content to the stdout")
-	output        = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
-	buildTags     = flag.String("tags", "", "comma-separated list of build tags to apply")
+	responseType  = flag.String("responseType", "interface{}", "the response type for the Do method")
+
+	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
+	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
 )
 
 // File holds a single parsed file and associated data.
@@ -774,7 +777,7 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		var doFuncTemplate = template.Must(
 			template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) (interface{}, error) {
+func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) (*{{ .ResponseTypeName }}, error) {
 	{{ $recv := .ReceiverName }}
 
 {{- if ne .ApiMethod "GET" }}
@@ -801,12 +804,12 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 		return nil, err
 	}
 
-	var apiResponse interface{}
+	var apiResponse {{ .ResponseTypeName }}
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
 
-	return apiResponse, nil
+	return &apiResponse, nil
 }
 `))
 		err = doFuncTemplate.Execute(&g.buf, struct {
@@ -815,12 +818,14 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context
 			ApiClientField string
 			ApiMethod      string
 			ApiUrl         string
+			ResponseTypeName   string
 		}{
 			StructType:     g.structType,
 			ReceiverName:   g.receiverName,
 			ApiClientField: *g.apiClientField,
 			ApiMethod:      *apiMethodStr,
 			ApiUrl:         *apiUrlStr,
+			ResponseTypeName: *responseType,
 		})
 		if err != nil {
 			log.Fatal(err)
