@@ -43,9 +43,9 @@ var (
 	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
 	apiUrlStr    = flag.String("url", "", "api url endpoint")
 
-	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
-	responseType  = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
-	responseDataType = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
+	parameterType     = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
+	responseType      = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
+	responseDataType  = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
 	responseDataField = flag.String("responseDataField", "", "the field name of the inner data of the response type")
 
 	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
@@ -573,7 +573,7 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
-		if err := g.generateDoMethod(funcMap) ; err != nil {
+		if err := g.generateDoMethod(funcMap); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -629,6 +629,8 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiMethod          string
 		ApiUrl             string
 		ResponseTypeName   string
+		ResponseDataType   string
+		ResponseDataField  string
 		HasQueryParameters bool
 	}{
 		StructType:         g.structType,
@@ -637,6 +639,8 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiMethod:          *apiMethodStr,
 		ApiUrl:             *apiUrlStr,
 		ResponseTypeName:   *responseType,
+		ResponseDataType:   *responseDataType,
+		ResponseDataField:  *responseDataField,
 		HasQueryParameters: len(g.queryFields) > 0,
 	})
 
@@ -968,4 +972,3 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 
 	return packages.Load(cfg, patterns...)
 }
-
