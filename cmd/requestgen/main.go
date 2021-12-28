@@ -166,6 +166,7 @@ type Generator struct {
 	// apiClientField if the request defined the client field with APIClient,
 	// it means we can generate the Do() method
 	apiClientField *string
+	authenticatedApiClient bool
 	structType     types.Type
 	receiverName   string
 
@@ -243,9 +244,13 @@ func (g *Generator) checkClientInterface(field *ast.Field) {
 	// github.com/c9s/requestgen.APIClient
 	if typeValue.Type.String() == "github.com/c9s/requestgen.APIClient" {
 		log.Debugf("found APIClient field %v -> %+v", field.Names, typeValue.Type.String())
-
 		g.apiClientField = &field.Names[0].Name
 		g.importPackages["context"] = struct{}{}
+	} else if typeValue.Type.String() == "github.com/c9s/requestgen.AuthenticatedAPIClient" {
+		log.Debugf("found AuthenticatedAPIClient field %v -> %+v", field.Names, typeValue.Type.String())
+		g.apiClientField = &field.Names[0].Name
+		g.importPackages["context"] = struct{}{}
+		g.authenticatedApiClient = true
 	}
 }
 
@@ -978,8 +983,6 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 			packages.NeedTypes | packages.NeedTypesSizes |
 			packages.NeedSyntax | packages.NeedTypesInfo |
 			packages.NeedDeps,
-		// TODO: Need to think about constants in test files. Maybe write type_string_test.go
-		// in a separate pass? For later.
 		Tests:      false,
 		BuildFlags: []string{fmt.Sprintf("-tags=%s", strings.Join(tags, " "))},
 	}

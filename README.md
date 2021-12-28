@@ -74,7 +74,7 @@ See the [generated example](./example/api/place_order_request_accessors.go)
 
 When responseType is not given, `interface{}` will be used for decoding the response content from the API server.
 
-For example:
+You can define your own responseType struct that can decode the API response, like this, e.g.,
 
 ```
 type Response struct {
@@ -119,14 +119,17 @@ You can implement your own http API client struct that satisfies the following i
 ```
 // APIClient defines the request builder method and request method for the API service
 type APIClient interface {
-	// NewAuthenticatedRequest builds up the http request for authentication-required endpoints
-	NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
-
 	// NewRequest builds up the http request for public endpoints
 	NewRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
 	// SendRequest sends the request object to the api gateway
 	SendRequest(req *http.Request) (*Response, error)
+}
+
+// AuthenticatedAPIClient defines the authenticated request builder
+type AuthenticatedAPIClient interface {
+	APIClient
+	AuthenticatedRequestBuilder
 }
 ```
 
