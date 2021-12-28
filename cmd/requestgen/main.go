@@ -33,6 +33,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/c9s/requestgen"
 )
 
 var (
@@ -44,8 +46,8 @@ var (
 	apiUrlStr    = flag.String("url", "", "api url endpoint")
 
 	parameterType     = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
-	responseType      = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
-	responseDataType  = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
+	responseTypeSel   = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
+	responseDataTypeSel  = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
 	responseDataField = flag.String("responseDataField", "", "the field name of the inner data of the response type")
 
 	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
@@ -156,19 +158,23 @@ func typeParamsTuple(a types.Type) *types.Tuple {
 
 type Generator struct {
 	buf bytes.Buffer // Accumulated output.
-	pkg *Package     // Package we are scanning.
 
 	// structTypeReceiverNames is used for collecting the receiver name of the given struct types
 	structTypeReceiverNames map[string]string
 
+	// TODO: clean up the package structure it's redundant
+	pkg *Package     // Package we are scanning.
+	currentPackage *packages.Package
 	importPackages map[string]struct{}
+
+	responseType, responseDataType types.Type
 
 	// apiClientField if the request defined the client field with APIClient,
 	// it means we can generate the Do() method
-	apiClientField *string
+	apiClientField         *string
 	authenticatedApiClient bool
-	structType     types.Type
-	receiverName   string
+	structType             types.Type
+	receiverName           string
 
 	// the collected fields
 	// fields is for post body
@@ -527,26 +533,34 @@ func (g *Generator) generate(typeName string) {
 		log.WithError(err).Errorf("parse package error")
 		return
 	}
+
 	for _, pkg := range usedPkg {
 		usedImports[pkg.Name] = pkg.Types
 	}
 
 	pkgTypes := g.pkg.pkg.Types
 	qf := func(other *types.Package) string {
-
-		log.Debugf("solving:%s current:%s", other.Path(), pkgTypes.Path())
 		if pkgTypes == other {
+			log.Debugf("importing %s from %s, same package object (pointer), no import", other.Path(), pkgTypes.Path())
 			return "" // same package; unqualified
+		}
+
+		if other.Path() == g.currentPackage.PkgPath {
+			log.Debugf("importing %s from %s, same package path, no import", other.Path(), pkgTypes.Path())
+			return ""
 		}
 
 		// solve imports
 		for _, ip := range pkgTypes.Imports() {
 			if other == ip {
+				log.Debugf("importing %s from %s, found imported %s", other.Path(), pkgTypes.Path(), ip)
+
 				usedImports[ip.Name()] = ip
 				return ip.Name()
 			}
 		}
 
+		log.Errorf("importing %s from %s, import not found", other.Path(), pkgTypes.Path())
 		return other.Path()
 	}
 
@@ -589,9 +603,9 @@ func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
 		template.New("do").Funcs(funcMap).Parse(`
 func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) (
 {{- if and .ResponseDataType .ResponseDataField -}}
-	{{ typeReference .ResponseDataType }}
+	{{ typeString (toPointer .ResponseDataType) }}
 {{- else -}}
-	{{ typeReference .ResponseTypeName }}
+	{{ typeString (toPointer .ResponseType) }}
 {{- end -}}
 	,error) {
 	{{ $recv := .ReceiverName }}
@@ -625,13 +639,13 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		return nil, err
 	}
 
-	var apiResponse {{ .ResponseTypeName }}
+	var apiResponse {{ typeString .ResponseType }}
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
 
 {{- if and .ResponseDataType .ResponseDataField }}
-	var data {{ .ResponseDataType }}
+	var data {{ typeString .ResponseDataType }}
 	if err := json.Unmarshal(apiResponse.{{ .ResponseDataField }}, &data) ; err != nil {
 		return nil, err
 	}
@@ -647,8 +661,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField     string
 		ApiMethod          string
 		ApiUrl             string
-		ResponseTypeName   string
-		ResponseDataType   string
+		ResponseType,ResponseDataType       types.Type
 		ResponseDataField  string
 		HasQueryParameters bool
 	}{
@@ -657,8 +670,8 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField:     *g.apiClientField,
 		ApiMethod:          *apiMethodStr,
 		ApiUrl:             *apiUrlStr,
-		ResponseTypeName:   *responseType,
-		ResponseDataType:   *responseDataType,
+		ResponseType:       g.responseType,
+		ResponseDataType:   g.responseDataType,
 		ResponseDataField:  *responseDataField,
 		HasQueryParameters: len(g.queryFields) > 0,
 	})
@@ -941,7 +954,42 @@ func main() {
 		log.Fatalf("error: %d packages found", len(pkgs))
 	}
 
+	g.currentPackage = pkgs[0]
 	g.addPackage(pkgs[0])
+
+	// parse response type
+	if responseTypeSel != nil && *responseTypeSel != "" {
+		if *responseTypeSel == "interface{}" {
+			g.responseType = types.NewInterfaceType(nil, nil)
+		} else {
+			o, err := parseTypeSelector(*responseTypeSel)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			g.responseType = o.Type()
+			if g.currentPackage.PkgPath != o.Pkg().Path() {
+				g.importPackages[o.Pkg().Path()] = struct{}{}
+			}
+		}
+	}
+
+	// parse response data type
+	if responseDataTypeSel != nil && *responseDataTypeSel != "" {
+		if *responseDataTypeSel == "interface{}" {
+			g.responseDataType = types.NewInterfaceType(nil, nil)
+		} else {
+			o, err := parseTypeSelector(*responseDataTypeSel)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			g.responseDataType = o.Type()
+			if g.currentPackage.PkgPath != o.Pkg().Path() {
+				g.importPackages[o.Pkg().Path()] = struct{}{}
+			}
+		}
+	}
 
 	g.printf("// Code generated by \"requestgen %s\"; DO NOT EDIT.\n", strings.Join(os.Args[1:], " "))
 	g.newline()
@@ -974,6 +1022,31 @@ func main() {
 	if err != nil {
 		log.Fatalf("writing output: %s", err)
 	}
+}
+
+func parseTypeSelector(sel string) (types.Object, error) {
+	ts, err := requestgen.ParseTypeSelector(sel)
+	if err != nil {
+		return nil, err
+	}
+
+	packages, err := parsePackage([]string{ts.Package}, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	for ident, o := range packages[0].TypesInfo.Defs {
+		if ident.Name == ts.Member && o.Pkg().Path() == ts.Package {
+			switch t := o.Type().(type) {
+			case *types.Named:
+				log.Infof("found named type: %+v", t)
+				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o.Type(), o.Pkg().Path())
+				return o, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("can not find type matches the type selector %+v", sel)
 }
 
 func parsePackage(patterns []string, tags []string) ([]*packages.Package, error) {

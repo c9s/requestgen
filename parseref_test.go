@@ -19,8 +19,8 @@ func TestParseTypeSelector(t *testing.T) {
 			},
 			wantErr: false,
 			wantSpec: TypeSelector{
-				pkg:        "github.com/c9s/requestgen",
-				pkgMember:  "APIClient",
+				Package: "github.com/c9s/requestgen",
+				Member:  "APIClient",
 			},
 		},
 		{
@@ -30,8 +30,8 @@ func TestParseTypeSelector(t *testing.T) {
 			},
 			wantErr: false,
 			wantSpec: TypeSelector{
-				pkg:        "github.com/c9s/requestgen",
-				pkgMember:  "APIClient",
+				Package: "github.com/c9s/requestgen",
+				Member:  "APIClient",
 			},
 		},
 	}

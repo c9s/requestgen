@@ -25,6 +25,13 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 		"typeTupleString": func(a *types.Tuple) interface{} {
 			return typeTupleString(a, false, qf)
 		},
+		"toPointer": func(a types.Type) types.Type {
+			switch a.(type) {
+			case *types.Interface:
+				return a
+			}
+			return types.NewPointer(a)
+		},
 		"typeString": func(a types.Type) interface{} {
 			return types.TypeString(a, qf)
 		},

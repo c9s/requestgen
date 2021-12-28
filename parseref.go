@@ -1,7 +1,6 @@
 package requestgen
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -14,8 +13,8 @@ import (
 )
 
 type TypeSelector struct {
-	pkg       string
-	pkgMember string
+	Package string
+	Member  string
 }
 
 func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
@@ -26,12 +25,12 @@ func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
 		return ts, err
 	}
 
-	bp, err := buildCtx.Import(ts.pkg, cwd, build.FindOnly)
+	bp, err := buildCtx.Import(ts.Package, cwd, build.FindOnly)
 	if err != nil {
-		return ts, fmt.Errorf("can't find package %q", ts.pkg)
+		return ts, fmt.Errorf("can't find package %q", ts.Package)
 	}
 
-	ts.pkg = bp.ImportPath
+	ts.Package = bp.ImportPath
 	return ts, nil
 }
 
@@ -42,7 +41,7 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 
 	if pkg := parseImportPath(e); pkg != "" {
 		// e.g. bytes or "encoding/json": a package
-		spec.pkg = pkg
+		spec.Package = pkg
 		return &spec, nil
 	}
 
@@ -56,8 +55,8 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 
 		if pkg := parseImportPath(x); pkg != "" {
 			// package member e.g. "encoding/json".HTMLEscape
-			spec.pkg = pkg              // e.g. "encoding/json"
-			spec.pkgMember = e.Sel.Name // e.g. "HTMLEscape"
+			spec.Package = pkg       // e.g. "encoding/json"
+			spec.Member = e.Sel.Name // e.g. "HTMLEscape"
 			return sanitizeImport(&spec)
 		}
 
@@ -65,14 +64,14 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 			// field/method of type e.g. ("encoding/json".Decoder).Decode
 			y := unparen(x.X)
 			if pkg := parseImportPath(y); pkg != "" {
-				spec.pkg = pkg              // e.g. "encoding/json"
-				spec.pkgMember = x.Sel.Name // e.g. "Decoder"
+				spec.Package = pkg       // e.g. "encoding/json"
+				spec.Member = x.Sel.Name // e.g. "Decoder"
 				return sanitizeImport(&spec)
 			}
 		}
 	}
 
-	return nil, errors.New("can not parse type")
+	return nil, fmt.Errorf("can not parse type selector: %q", main)
 }
 
 func unparen(e ast.Expr) ast.Expr { return astutil.Unparen(e) }
