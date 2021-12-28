@@ -44,10 +44,47 @@ type ComplexArg struct {
 type Response struct {
 	Code    string          `json:"code"`
 	Message string          `json:"msg"`
+	CurrentPage int `json:"currentPage"`
+	PageSize    int `json:"pageSize"`
+	TotalNum    int `json:"totalNum"`
+	TotalPage   int `json:"totalPage"`
 	Data    json.RawMessage `json:"data"`
 }
 
-//go:generate requestgen -type PlaceOrderRequest -responseType Response
+type Order struct {
+	Id            string `json:"id"`
+	Symbol        string `json:"symbol"`
+	OpType        string `json:"opType"`
+	Type          string `json:"type"`
+	Side          string `json:"side"`
+	Price         string `json:"price"`
+	Size          string `json:"size"`
+	Funds         string `json:"funds"`
+	DealFunds     string `json:"dealFunds"`
+	DealSize      string `json:"dealSize"`
+	Fee           string `json:"fee"`
+	FeeCurrency   string `json:"feeCurrency"`
+	Stp           string `json:"stp"`
+	Stop          string `json:"stop"`
+	StopTriggered bool   `json:"stopTriggered"`
+	StopPrice     string `json:"stopPrice"`
+	TimeInForce   string `json:"timeInForce"`
+	PostOnly      bool   `json:"postOnly"`
+	Hidden        bool   `json:"hidden"`
+	Iceberg       bool   `json:"iceberg"`
+	VisibleSize   string `json:"visibleSize"`
+	CancelAfter   int    `json:"cancelAfter"`
+	Channel       string `json:"channel"`
+	ClientOid     string `json:"clientOid"`
+	Remark        string `json:"remark"`
+	Tags          string `json:"tags"`
+	IsActive      bool   `json:"isActive"`
+	CancelExist   bool   `json:"cancelExist"`
+	CreatedAt     int64  `json:"createdAt"`
+	TradeType     string `json:"tradeType"`
+}
+
+//go:generate requestgen -type PlaceOrderRequest -responseType Response -responseDataField Data -responseDataType Order
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
 

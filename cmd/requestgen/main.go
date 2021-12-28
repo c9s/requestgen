@@ -582,7 +582,13 @@ func (g *Generator) generate(typeName string) {
 func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
 	var doFuncTemplate = template.Must(
 		template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
+func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) (
+{{- if and .ResponseDataType .ResponseDataField -}}
+	{{ typeReference .ResponseDataType }}
+{{- else -}}
+	{{ typeReference .ResponseTypeName }}
+{{- end -}}
+	,error) {
 	{{ $recv := .ReceiverName }}
 
 {{- if ne .ApiMethod "GET" }}
@@ -619,7 +625,15 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		return nil, err
 	}
 
+{{- if and .ResponseDataType .ResponseDataField }}
+	var data {{ .ResponseDataType }}
+	if err := json.Unmarshal(apiResponse.{{ .ResponseDataField }}, &data) ; err != nil {
+		return nil, err
+	}
+	return &data, nil
+{{- else }}
 	return &apiResponse, nil
+{{- end }}
 }
 `))
 	err := doFuncTemplate.Execute(&g.buf, struct {
