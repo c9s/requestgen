@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/c9s/requestgen"
@@ -40,7 +41,13 @@ type ComplexArg struct {
 	A, B int
 }
 
-//go:generate requestgen -type PlaceOrderRequest
+type Response struct {
+	Code    string          `json:"code"`
+	Message string          `json:"msg"`
+	Data    json.RawMessage `json:"data"`
+}
+
+//go:generate requestgen -type PlaceOrderRequest -responseType Response
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
 
@@ -71,4 +78,3 @@ type PlaceOrderRequest struct {
 	// page defines the query parameters for something like '?page=123'
 	page *int64 `param:"page,query"`
 }
-

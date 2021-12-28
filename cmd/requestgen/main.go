@@ -19,7 +19,6 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/token"
 	"go/types"
 	"io/ioutil"
@@ -45,7 +44,9 @@ var (
 	apiUrlStr    = flag.String("url", "", "api url endpoint")
 
 	parameterType = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
-	responseType  = flag.String("responseType", "interface{}", "the response type for the Do method")
+	responseType  = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
+	responseDataType = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
+	responseDataField = flag.String("responseDataField", "", "the field name of the inner data of the response type")
 
 	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
 	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
@@ -952,85 +953,6 @@ func main() {
 	}
 }
 
-// typeTupleString converts Tuple types to string
-func typeTupleString(tup *types.Tuple, variadic bool, qf types.Qualifier) string {
-	buf := bytes.NewBuffer(nil)
-	// buf.WriteByte('(')
-	if tup != nil {
-
-		for i := 0; i < tup.Len(); i++ {
-			v := tup.At(i)
-			if i > 0 {
-				buf.WriteString(", ")
-			}
-
-			name := v.Name()
-			if name != "" {
-				buf.WriteString(name)
-				buf.WriteByte(' ')
-			}
-
-			typ := v.Type()
-
-			if variadic && i == tup.Len()-1 {
-				if s, ok := typ.(*types.Slice); ok {
-					buf.WriteString("...")
-					typ = s.Elem()
-				} else {
-					// special case:
-					// append(s, "foo"...) leads to signature func([]byte, string...)
-					if t, ok := typ.Underlying().(*types.Basic); !ok || t.Kind() != types.String {
-						panic("internal error: string type expected")
-					}
-					types.WriteType(buf, typ, qf)
-					buf.WriteString("...")
-					continue
-				}
-			}
-			types.WriteType(buf, typ, qf)
-		}
-	}
-	// buf.WriteByte(')')
-	return buf.String()
-}
-
-func templateFuncs(qf types.Qualifier) template.FuncMap {
-	return template.FuncMap{
-		"typeReference": func(a string) string {
-			if a == "interface{}" {
-				return a
-			}
-
-			return "*" + a
-		},
-		"camelCase": func(a string) interface{} {
-			return strings.ToLower(string(a[0])) + string(a[1:])
-		},
-		"join": func(sep string, a []string) interface{} {
-			return strings.Join(a, sep)
-		},
-		"toGoTupleString": toGoTupleString,
-		"typeTupleString": func(a *types.Tuple) interface{} {
-			return typeTupleString(a, false, qf)
-		},
-		"typeString": func(a types.Type) interface{} {
-			return types.TypeString(a, qf)
-		},
-	}
-}
-
-func formatBuffer(buf bytes.Buffer) []byte {
-	src, err := format.Source(buf.Bytes())
-	if err != nil {
-		// Should never happen, but can arise when developing this code.
-		// The user can compile the output to see the error.
-		log.Printf("warning: internal error: invalid Go generated: %s", err)
-		log.Printf("warning: compile the package to analyze the error")
-		return buf.Bytes()
-	}
-	return src
-}
-
 func parsePackage(patterns []string, tags []string) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
@@ -1047,79 +969,3 @@ func parsePackage(patterns []string, tags []string) ([]*packages.Package, error)
 	return packages.Load(cfg, patterns...)
 }
 
-func getUnderlyingType(a types.Type) types.Type {
-	p, ok := a.(*types.Pointer)
-	if ok {
-		a = p.Elem()
-	}
-
-	for {
-		if n, ok := a.(*types.Named); ok {
-			a = n.Underlying()
-		} else {
-			break
-		}
-	}
-
-	return a
-}
-
-func isTypeInt(a types.Type) bool {
-	a = getUnderlyingType(a)
-	switch ua := a.(type) {
-
-	case *types.Basic:
-		switch ua.Kind() {
-		case types.Int, types.Int32, types.Int64:
-			return true
-
-		}
-
-	}
-
-	return false
-}
-
-func getBasicKind(a types.Type) types.BasicKind {
-	a = getUnderlyingType(a)
-	switch ua := a.(type) {
-
-	case *types.Basic:
-		return ua.Kind()
-	}
-
-	return 0
-}
-
-func isTypeString(a types.Type) bool {
-	a = getUnderlyingType(a)
-	switch ua := a.(type) {
-
-	case *types.Basic:
-		return ua.Kind() == types.String
-
-	}
-
-	return false
-}
-
-func debugUnderlying(k string, a types.Type) {
-	underlying := a.Underlying()
-	switch ua := underlying.(type) {
-	case *types.Basic:
-		log.Debugf("%s %+v underlying -> basic: %+v info: %+v kind: %+v", k, a, ua, ua.Info(), ua.Kind())
-		switch ua.Kind() {
-		case types.String:
-		case types.Int:
-		case types.Bool:
-
-		}
-
-	case *types.Struct:
-		log.Debugf("%s %+v underlying -> struct: %+v numFields: %d", k, a, ua, ua.NumFields())
-
-	default:
-		log.Debugf("%s %+v underlying -> default: %+v", k, a, ua)
-
-	}
-}
