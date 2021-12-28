@@ -781,7 +781,7 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte,
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		var doFuncTemplate = template.Must(
 			template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} {{ typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
+func ({{- .ReceiverName }} *{{ typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
 	{{ $recv := .ReceiverName }}
 
 {{- if ne .ApiMethod "GET" }}
