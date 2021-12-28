@@ -508,10 +508,6 @@ func (g *Generator) generate(typeName string) {
 		ast.Inspect(file.file, g.requestStructWalker(typeName, file))
 	}
 
-	if len(g.fields) == 0 {
-		return
-	}
-
 	// conf := types.Config{Importer: importer.Default()}
 
 	var usedImports = map[string]*types.Package{}
