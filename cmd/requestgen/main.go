@@ -104,11 +104,6 @@ type Field struct {
 	File *ast.File
 
 	ValidValues interface{}
-
-	// StructName is the struct of the given request type
-	StructName     string
-	StructTypeName string
-	ReceiverName   string
 }
 
 // toGoTupleString converts type to go literal tuple
