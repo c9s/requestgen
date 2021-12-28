@@ -759,19 +759,21 @@ func ({{- $recv }} * {{- $structType -}} ) GetParametersJSON() ([]byte, error) {
 
 `))
 
-	err = parameterFuncTemplate.Execute(&g.buf, struct {
-		FirstField  Field
-		Fields      []Field
-		QueryFields []Field
-		Qualifier   types.Qualifier
-	}{
-		FirstField:  g.fields[0],
-		Fields:      g.fields,
-		QueryFields: g.queryFields,
-		Qualifier:   qf,
-	})
-	if err != nil {
-		log.Fatal(err)
+	if len(g.fields) > 0 {
+		err = parameterFuncTemplate.Execute(&g.buf, struct {
+			FirstField  Field
+			Fields      []Field
+			QueryFields []Field
+			Qualifier   types.Qualifier
+		}{
+			FirstField:  g.fields[0],
+			Fields:      g.fields,
+			QueryFields: g.queryFields,
+			Qualifier:   qf,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
