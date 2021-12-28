@@ -70,9 +70,9 @@ See the [generated example](./example/api/place_order_request_accessors.go)
 
 ## Command Options
 
-`-responseType [responseType]`
+`-responseType [responseTypeSelector]`
 
-When responseType is not given, `interface{}` will be used for decoding the response content from the API server.
+When `responseTypeSelector` is not given, `interface{}` will be used for decoding the response content from the API server.
 
 You can define your own responseType struct that can decode the API response, like this, e.g.,
 
@@ -86,6 +86,16 @@ type Response struct {
 	TotalPage   int `json:"totalPage"`
 	Orders      []Orders `json:"orders"`
 }
+```
+
+And then use the type selector like this:
+
+```shell
+# if the type is in a relative package
+requestgen -responseType '"./example/api".Response'
+
+# if the type is in the same package
+requestgen -responseType '".".Response'
 ```
 
 `-responseDataField [dataField]`
