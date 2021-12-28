@@ -105,7 +105,6 @@ type Field struct {
 	// StructName is the struct of the given request type
 	StructName     string
 	StructTypeName string
-	StructType     *types.Struct
 	ReceiverName   string
 }
 
@@ -391,7 +390,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 
 			StructName:     typeSpec.Name.String(),
 			StructTypeName: fullTypeName,
-			StructType:     structTV.Type.(*types.Struct),
 			ReceiverName:   receiverName,
 			File:           file,
 		}
@@ -557,13 +555,15 @@ func (g *Generator) generate(typeName string) {
 	var funcMap = templateFuncs(qf)
 
 	type accessorTemplateArgs struct {
-		Field     Field
-		Qualifier types.Qualifier
+		StructType   types.Type
+		ReceiverName string
+		Field        Field
+		Qualifier    types.Qualifier
 	}
 
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
-func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) *{{ .Field.StructName -}} {
+func ({{- .ReceiverName }} {{ typeString .StructType -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) *{{ .Field.StructName -}} {
 	{{ .Field.ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .Field.ReceiverName }}
 }
@@ -582,8 +582,10 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	for _, field := range g.queryFields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:     field,
-			Qualifier: qf,
+			Field:        field,
+			Qualifier:    qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -592,8 +594,10 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 
 	for _, field := range g.fields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:     field,
-			Qualifier: qf,
+			Field:        field,
+			Qualifier:    qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -658,7 +662,7 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 {{- end }}
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
-func ({{- $recv }} {{- typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
+func ({{- $recv }} {{ typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 {{- range .QueryFields }}
@@ -697,7 +701,7 @@ func ({{- $recv }} {{- typeString .StructType -}} ) GetQueryParameters() (url.Va
 
 
 // GetParameters builds and checks the parameters and return the result in a map object
-func ({{- $recv }} {{- typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
+func ({{- $recv }} {{ typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 {{- range .Fields }}
@@ -730,7 +734,7 @@ func ({{- $recv }} {{- typeString .StructType -}} ) GetParameters() (map[string]
 }
 
 // GetParametersQuery converts the parameters from GetParameters into the url.Values format
-func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
+func ({{- $recv }} {{ typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
 	params, err := {{ $recv }}.GetParameters()
@@ -746,7 +750,7 @@ func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersQuery() (url.Va
 }
 
 // GetParametersJSON converts the parameters from GetParameters into the JSON format
-func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersJSON() ([]byte, error) {
+func ({{- $recv }} {{ typeString .StructType -}} ) GetParametersJSON() ([]byte, error) {
 	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
 		return nil, err
