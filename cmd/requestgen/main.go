@@ -211,7 +211,7 @@ func (g *Generator) registerReceiverNameOfType(decl *ast.FuncDecl) bool {
 	// skip if the typeAndValue is not defined in this parsed package
 	receiverTypeValue, ok := g.pkg.pkg.TypesInfo.Types[receiver.Type]
 	if !ok {
-		return true
+		return false
 	}
 
 	// use ident to look up type
@@ -222,16 +222,12 @@ func (g *Generator) registerReceiverNameOfType(decl *ast.FuncDecl) bool {
 	switch receiverType := receiverTypeValue.Type.(type) {
 	case *types.Named:
 		g.structTypeReceiverNames[receiverType.String()] = receiver.Names[0].String()
-		g.receiverName = receiver.Names[0].String()
-		g.structType = receiverTypeValue.Type
 
 	case *types.Pointer:
 		g.structTypeReceiverNames[receiverType.Elem().String()] = receiver.Names[0].String()
-		g.receiverName = receiver.Names[0].String()
-		g.structType = receiverTypeValue.Type
 	}
 
-	return true
+	return false
 }
 
 func (g *Generator) checkClientInterface(field *ast.Field) {
@@ -252,10 +248,17 @@ func (g *Generator) checkClientInterface(field *ast.Field) {
 func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structType *ast.StructType) {
 	typeDef := g.pkg.pkg.TypesInfo.Defs[typeSpec.Name]
 	fullTypeName := typeDef.Type().String()
-	_ = fullTypeName
 
-	structTV := g.pkg.pkg.TypesInfo.Types[structType]
-	_ = structTV
+	// structTV := g.pkg.pkg.TypesInfo.Types[structType]
+
+	g.structType = typeDef.Type()
+
+	receiverName, ok := g.structTypeReceiverNames[fullTypeName]
+	if !ok {
+		// use default
+		receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
+	}
+	g.receiverName = receiverName
 
 	// iterate the field list (by syntax)
 	for _, field := range structType.Fields.List {
@@ -367,11 +370,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			return
 		}
 
-		receiverName, ok := g.structTypeReceiverNames[fullTypeName]
-		if !ok {
-			receiverName = strings.ToLower(string(typeSpec.Name.String()[0]))
-			g.receiverName = receiverName
-		}
 		f := Field{
 			Name:               field.Names[0].Name,
 			Type:               typeValue.Type,
@@ -388,9 +386,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			ValidValues:        validValues,
 			DefaultValuer:      defaultValuer,
 
-			StructName:     typeSpec.Name.String(),
-			StructTypeName: fullTypeName,
-			ReceiverName:   receiverName,
 			File:           file,
 		}
 
@@ -561,13 +556,6 @@ func (g *Generator) generate(typeName string) {
 		Qualifier    types.Qualifier
 	}
 
-	var setterFuncTemplate = template.Must(
-		template.New("accessor").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} {{ typeString .StructType -}}) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) *{{ .Field.StructName -}} {
-	{{ .Field.ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
-	return {{ .Field.ReceiverName }}
-}
-`))
 
 	if len(usedImports) > 0 {
 		g.printf("import (")
@@ -580,6 +568,13 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) {{ .Field.SetterName }
 		g.newline()
 	}
 
+	var setterFuncTemplate = template.Must(
+		template.New("accessor").Funcs(funcMap).Parse(`
+func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
+	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
+	return {{ .ReceiverName }}
+}
+`))
 	for _, field := range g.queryFields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:        field,
@@ -662,7 +657,7 @@ func ({{- .ReceiverName }} {{ typeString .StructType -}}) {{ .Field.SetterName }
 {{- end }}
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
-func ({{- $recv }} {{ typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
+func ({{- $recv }} *{{ typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 {{- range .QueryFields }}
@@ -701,7 +696,7 @@ func ({{- $recv }} {{ typeString .StructType -}} ) GetQueryParameters() (url.Val
 
 
 // GetParameters builds and checks the parameters and return the result in a map object
-func ({{- $recv }} {{ typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
+func ({{- $recv }} *{{ typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 {{- range .Fields }}
@@ -734,7 +729,7 @@ func ({{- $recv }} {{ typeString .StructType -}} ) GetParameters() (map[string]i
 }
 
 // GetParametersQuery converts the parameters from GetParameters into the url.Values format
-func ({{- $recv }} {{ typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
+func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
 	params, err := {{ $recv }}.GetParameters()
@@ -750,7 +745,7 @@ func ({{- $recv }} {{ typeString .StructType -}} ) GetParametersQuery() (url.Val
 }
 
 // GetParametersJSON converts the parameters from GetParameters into the JSON format
-func ({{- $recv }} {{ typeString .StructType -}} ) GetParametersJSON() ([]byte, error) {
+func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte, error) {
 	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
 		return nil, err

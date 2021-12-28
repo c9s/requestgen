@@ -234,7 +234,7 @@ func (p *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
 	return json.Marshal(params)
 }
 
-func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
+func (p PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 
 	var params interface{}
 
