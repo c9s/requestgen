@@ -2,17 +2,37 @@ package requestgen
 
 import (
 	"errors"
+	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
+	"os"
 	"strconv"
 
 	"golang.org/x/tools/go/ast/astutil"
 )
 
 type TypeSelector struct {
-	pkg        string
-	pkgMember  string
+	pkg       string
+	pkgMember string
+}
+
+func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
+	buildCtx := build.Default
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ts, err
+	}
+
+	bp, err := buildCtx.Import(ts.pkg, cwd, build.FindOnly)
+	if err != nil {
+		return ts, fmt.Errorf("can't find package %q", ts.pkg)
+	}
+
+	ts.pkg = bp.ImportPath
+	return ts, nil
 }
 
 func ParseTypeSelector(main string) (*TypeSelector, error) {
@@ -38,16 +58,16 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 			// package member e.g. "encoding/json".HTMLEscape
 			spec.pkg = pkg              // e.g. "encoding/json"
 			spec.pkgMember = e.Sel.Name // e.g. "HTMLEscape"
-			return &spec, nil
+			return sanitizeImport(&spec)
 		}
 
 		if x, ok := x.(*ast.SelectorExpr); ok {
 			// field/method of type e.g. ("encoding/json".Decoder).Decode
 			y := unparen(x.X)
 			if pkg := parseImportPath(y); pkg != "" {
-				spec.pkg = pkg               // e.g. "encoding/json"
-				spec.pkgMember = x.Sel.Name  // e.g. "Decoder"
-				return &spec, nil
+				spec.pkg = pkg              // e.g. "encoding/json"
+				spec.pkgMember = x.Sel.Name // e.g. "Decoder"
+				return sanitizeImport(&spec)
 			}
 		}
 	}

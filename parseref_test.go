@@ -13,9 +13,20 @@ func TestParseTypeSelector(t *testing.T) {
 		wantSpec TypeSelector
 	}{
 		{
-			name: "simple",
+			name: "full-qualified",
 			args: args{
 				main: `"github.com/c9s/requestgen".APIClient`,
+			},
+			wantErr: false,
+			wantSpec: TypeSelector{
+				pkg:        "github.com/c9s/requestgen",
+				pkgMember:  "APIClient",
+			},
+		},
+		{
+			name: "cwd",
+			args: args{
+				main: `".".APIClient`,
 			},
 			wantErr: false,
 			wantSpec: TypeSelector{
