@@ -605,7 +605,6 @@ func ({{- .Field.ReceiverName }} *{{ .Field.StructName -}}) {{ .Field.SetterName
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
 {{ $recv := .ReceiverName }}
-{{ $structType := .FirstField.StructName }}
 
 {{- define "check-required" }}
 {{- if .Required }}
@@ -762,14 +761,12 @@ func ({{- $recv }} {{- typeString .StructType -}} ) GetParametersJSON() ([]byte,
 		err = parameterFuncTemplate.Execute(&g.buf, struct {
 			StructType   types.Type
 			ReceiverName string
-			FirstField   Field
 			Fields       []Field
 			QueryFields  []Field
 			Qualifier    types.Qualifier
 		}{
 			StructType:   g.structType,
 			ReceiverName: g.receiverName,
-			FirstField:   g.fields[0],
 			Fields:       g.fields,
 			QueryFields:  g.queryFields,
 			Qualifier:    qf,
