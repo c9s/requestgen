@@ -552,13 +552,6 @@ func (g *Generator) generate(typeName string) {
 
 	var funcMap = templateFuncs(qf)
 
-	type accessorTemplateArgs struct {
-		StructType   types.Type
-		ReceiverName string
-		Field        Field
-		Qualifier    types.Qualifier
-	}
-
 	if len(usedImports) > 0 {
 		g.printf("import (")
 		g.newline()
@@ -570,39 +563,84 @@ func (g *Generator) generate(typeName string) {
 		g.newline()
 	}
 
-	var setterFuncTemplate = template.Must(
-		template.New("accessor").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
-	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
-	return {{ .ReceiverName }}
+	if err := g.generateSetters(funcMap, qf); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := g.generateParameterMethods(funcMap, qf); err != nil {
+		log.Fatal(err)
+	}
+
+	if g.apiClientField != nil && *apiUrlStr != "" {
+		var doFuncTemplate = template.Must(
+			template.New("do").Funcs(funcMap).Parse(`
+func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
+	{{ $recv := .ReceiverName }}
+
+{{- if ne .ApiMethod "GET" }}
+	params, err := {{ $recv }}.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+{{- else }}
+  // empty params for GET operation
+	var params interface{}
+{{- end }}
+
+{{- if .HasQueryParameters }}
+	query, err := {{ $recv }}.GetQueryParameters()
+	if err != nil {
+		return nil, err
+	}
+{{- else }}
+  query := url.Values{}
+{{- end }}
+
+	req, err := {{ $recv }}.{{ .ApiClientField }}.NewRequest("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := {{ $recv }}.{{ .ApiClientField }}.SendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse {{ .ResponseTypeName }}
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	return &apiResponse, nil
 }
 `))
-	for _, field := range g.queryFields {
-		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:        field,
-			Qualifier:    qf,
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
+		err = doFuncTemplate.Execute(&g.buf, struct {
+			StructType         types.Type
+			ReceiverName       string
+			ApiClientField     string
+			ApiMethod          string
+			ApiUrl             string
+			ResponseTypeName   string
+			HasQueryParameters bool
+		}{
+			StructType:         g.structType,
+			ReceiverName:       g.receiverName,
+			ApiClientField:     *g.apiClientField,
+			ApiMethod:          *apiMethodStr,
+			ApiUrl:             *apiUrlStr,
+			ResponseTypeName:   *responseType,
+			HasQueryParameters: len(g.queryFields) > 0,
 		})
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	for _, field := range g.fields {
-		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:        field,
-			Qualifier:    qf,
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+}
 
+func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(other *types.Package) string) error {
+	var err error
 	var parameterFuncTemplate *template.Template
-
 	parameterFuncTemplate = template.Must(
 		template.New("parameters").Funcs(funcMap).Parse(`
 {{ $recv := .ReceiverName }}
@@ -696,7 +734,6 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 	return query, nil
 }
 
-
 // GetParameters builds and checks the parameters and return the result in a map object
 func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
@@ -724,7 +761,6 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 
 	{{ template "assign" . }}
 {{- end }}
-
 {{- end }}
 
 	return params, nil
@@ -773,75 +809,53 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte,
 			Qualifier:    qf,
 		})
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 
-	if g.apiClientField != nil && *apiUrlStr != "" {
-		var doFuncTemplate = template.Must(
-			template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
-	{{ $recv := .ReceiverName }}
+	return err
+}
 
-{{- if ne .ApiMethod "GET" }}
-	params, err := {{ $recv }}.GetParameters()
-	if err != nil {
-		return nil, err
-	}
-{{- else }}
-  // empty params for GET operation
-	var params interface{}
-{{- end }}
-
-{{- if .HasQueryParameters }}
-	query, err := {{ $recv }}.GetQueryParameters()
-	if err != nil {
-		return nil, err
-	}
-{{- else }}
-  query := url.Values{}
-{{- end }}
-
-	req, err := {{ $recv }}.{{ .ApiClientField }}.NewRequest("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
-	if err != nil {
-		return nil, err
+func (g *Generator) generateSetters(funcMap template.FuncMap, qf func(other *types.Package) string) error {
+	type accessorTemplateArgs struct {
+		StructType   types.Type
+		ReceiverName string
+		Field        Field
+		Qualifier    types.Qualifier
 	}
 
-	response, err := {{ $recv }}.{{ .ApiClientField }}.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse {{ .ResponseTypeName }}
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return &apiResponse, nil
+	var setterFuncTemplate = template.Must(
+		template.New("accessor").Funcs(funcMap).Parse(`
+func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
+	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
+	return {{ .ReceiverName }}
 }
 `))
-		err = doFuncTemplate.Execute(&g.buf, struct {
-			StructType         types.Type
-			ReceiverName       string
-			ApiClientField     string
-			ApiMethod          string
-			ApiUrl             string
-			ResponseTypeName   string
-			HasQueryParameters bool
-		}{
-			StructType:         g.structType,
-			ReceiverName:       g.receiverName,
-			ApiClientField:     *g.apiClientField,
-			ApiMethod:          *apiMethodStr,
-			ApiUrl:             *apiUrlStr,
-			ResponseTypeName:   *responseType,
-			HasQueryParameters: len(g.queryFields) > 0,
+	for _, field := range g.queryFields {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:        field,
+			Qualifier:    qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
 		})
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 
+	for _, field := range g.fields {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:        field,
+			Qualifier:    qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func main() {
