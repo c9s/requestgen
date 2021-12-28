@@ -389,7 +389,7 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 			ValidValues:        validValues,
 			DefaultValuer:      defaultValuer,
 
-			File:           file,
+			File: file,
 		}
 
 		// query parameters
@@ -559,7 +559,6 @@ func (g *Generator) generate(typeName string) {
 		Qualifier    types.Qualifier
 	}
 
-
 	if len(usedImports) > 0 {
 		g.printf("import (")
 		g.newline()
@@ -660,7 +659,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 {{- end }}
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
-func ({{- $recv }} *{{ typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
+func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 {{- range .QueryFields }}
@@ -699,7 +698,7 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetQueryParameters() (url.Va
 
 
 // GetParameters builds and checks the parameters and return the result in a map object
-func ({{- $recv }} *{{ typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
+func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 {{- range .Fields }}
@@ -732,7 +731,7 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParameters() (map[string]
 }
 
 // GetParametersQuery converts the parameters from GetParameters into the url.Values format
-func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
+func ({{- $recv }} * {{- typeString .StructType -}} ) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
 	params, err := {{ $recv }}.GetParameters()
@@ -781,7 +780,7 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte,
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		var doFuncTemplate = template.Must(
 			template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} *{{ typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
+func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) ({{ typeReference .ResponseTypeName }}, error) {
 	{{ $recv := .ReceiverName }}
 
 {{- if ne .ApiMethod "GET" }}
@@ -822,21 +821,21 @@ func ({{- .ReceiverName }} *{{ typeString .StructType -}}) Do(ctx context.Contex
 }
 `))
 		err = doFuncTemplate.Execute(&g.buf, struct {
-			StructType       types.Type
-			ReceiverName     string
-			ApiClientField   string
-			ApiMethod        string
-			ApiUrl           string
-			ResponseTypeName string
+			StructType         types.Type
+			ReceiverName       string
+			ApiClientField     string
+			ApiMethod          string
+			ApiUrl             string
+			ResponseTypeName   string
 			HasQueryParameters bool
 		}{
-			StructType:       g.structType,
-			ReceiverName:     g.receiverName,
-			ApiClientField:   *g.apiClientField,
-			ApiMethod:        *apiMethodStr,
-			ApiUrl:           *apiUrlStr,
-			ResponseTypeName: *responseType,
-			HasQueryParameters:    len(g.queryFields) > 0,
+			StructType:         g.structType,
+			ReceiverName:       g.receiverName,
+			ApiClientField:     *g.apiClientField,
+			ApiMethod:          *apiMethodStr,
+			ApiUrl:             *apiUrlStr,
+			ResponseTypeName:   *responseType,
+			HasQueryParameters: len(g.queryFields) > 0,
 		})
 		if err != nil {
 			log.Fatal(err)
