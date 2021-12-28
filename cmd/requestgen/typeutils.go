@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"go/types"
+	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -125,3 +128,49 @@ func debugUnderlying(k string, a types.Type) {
 
 	}
 }
+
+// toGoTupleString converts type to go literal tuple
+func toGoTupleString(a interface{}) string {
+	switch v := a.(type) {
+	case []int:
+		var ss []string
+		for _, i := range v {
+			ss = append(ss, strconv.Itoa(i))
+		}
+		return strings.Join(ss, ", ")
+
+	case []string:
+		var qs []string
+		for _, s := range v {
+			qs = append(qs, strconv.Quote(s))
+		}
+		return strings.Join(qs, ", ")
+
+	default:
+		panic(fmt.Errorf("unsupported type: %+v", v))
+
+	}
+
+	return "nil"
+}
+
+func typeParamsTuple(a types.Type) *types.Tuple {
+	switch a := a.(type) {
+
+	// pure signature callback, like:
+	// for func(a bool, b bool) error
+	// we return the "a bool, b bool"
+	case *types.Signature:
+		return a.Params()
+
+	// named type callback, like: BookGenerator, RequestHandler, PositionUpdater
+	case *types.Named:
+		// fetch the underlying type and return the params tuple
+		return typeParamsTuple(a.Underlying())
+
+	default:
+		return nil
+
+	}
+}
+

@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -65,90 +64,6 @@ type Package struct {
 	pkg   *packages.Package
 	defs  map[*ast.Ident]types.Object
 	files []*File
-}
-
-type Field struct {
-	Name string
-
-	Type types.Type
-
-	// ArgType is the argument type of the setter
-	ArgType types.Type
-
-	ArgKind types.BasicKind
-
-	IsString bool
-
-	IsInt bool
-
-	IsTime bool
-
-	DefaultValuer string
-
-	Default interface{}
-
-	IsMillisecondsTime, IsSecondsTime bool
-
-	// SetterName is the method name of the setter
-	SetterName string
-
-	// JsonKey is the key that is used for setting the parameters
-	JsonKey string
-
-	// Optional - is this field an optional parameter?
-	Optional bool
-
-	// Required means we will check the interval value of the field, empty string or zero will be rejected
-	Required bool
-
-	File *ast.File
-
-	ValidValues interface{}
-}
-
-// toGoTupleString converts type to go literal tuple
-func toGoTupleString(a interface{}) string {
-	switch v := a.(type) {
-	case []int:
-		var ss []string
-		for _, i := range v {
-			ss = append(ss, strconv.Itoa(i))
-		}
-		return strings.Join(ss, ", ")
-
-	case []string:
-		var qs []string
-		for _, s := range v {
-			qs = append(qs, strconv.Quote(s))
-		}
-		return strings.Join(qs, ", ")
-
-	default:
-		panic(fmt.Errorf("unsupported type: %+v", v))
-
-	}
-
-	return "nil"
-}
-
-func typeParamsTuple(a types.Type) *types.Tuple {
-	switch a := a.(type) {
-
-	// pure signature callback, like:
-	// for func(a bool, b bool) error
-	// we return the "a bool, b bool"
-	case *types.Signature:
-		return a.Params()
-
-	// named type callback, like: BookGenerator, RequestHandler, PositionUpdater
-	case *types.Named:
-		// fetch the underlying type and return the params tuple
-		return typeParamsTuple(a.Underlying())
-
-	default:
-		return nil
-
-	}
 }
 
 type Generator struct {
@@ -255,7 +170,7 @@ func (g *Generator) checkClientInterface(field *ast.Field) {
 	}
 }
 
-func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structType *ast.StructType) {
+func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, structType *ast.StructType) {
 	typeDef := g.pkg.pkg.TypesInfo.Defs[typeSpec.Name]
 	fullTypeName := typeDef.Type().String()
 
@@ -408,37 +323,6 @@ func (g *Generator) parseStruct(file *ast.File, typeSpec *ast.TypeSpec, structTy
 	}
 }
 
-func parseValidValuesTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {
-	validValuesTag, _ := tags.Get("validValues")
-	if validValuesTag == nil {
-		return nil, nil
-	}
-
-	var validValues interface{}
-	validValueList := strings.Split(validValuesTag.Value(), ",")
-
-	log.Debugf("%s found valid values: %v", fieldName, validValueList)
-
-	switch argKind {
-	case types.Int, types.Int64, types.Int32:
-		var slice []int
-		for _, s := range validValueList {
-			i, err := strconv.Atoi(s)
-			if err != nil {
-				return nil, err
-			}
-
-			slice = append(slice, i)
-		}
-
-	case types.String:
-		validValues = validValueList
-
-	}
-
-	return validValues, nil
-}
-
 func (g *Generator) receiverNameWalker(typeName string, file *File) func(ast.Node) bool {
 	return func(node ast.Node) bool {
 		switch decl := node.(type) {
@@ -486,7 +370,7 @@ func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.No
 					return false
 				}
 
-				g.parseStruct(file.file, typeSpec, structType)
+				g.parseStructFields(file.file, typeSpec, structType)
 			}
 
 		default:
