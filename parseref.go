@@ -26,6 +26,7 @@ func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
 		return ts, err
 	}
 
+	// parse the package file structure and information (this call does not build or compile)
 	bp, err := buildCtx.Import(ts.Package, cwd, build.FindOnly)
 	if err != nil {
 		return ts, fmt.Errorf("can't find package %q", ts.Package)

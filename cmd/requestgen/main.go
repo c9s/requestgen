@@ -408,17 +408,17 @@ func (g *Generator) generate(typeName string) {
 	var usedImports = map[string]*types.Package{}
 
 	if len(g.fields) > 0 {
-		g.importPackages["fmt"] = struct{}{}
-		g.importPackages["net/url"] = struct{}{}
-		g.importPackages["encoding/json"] = struct{}{}
+		g.importPackage("fmt")
+		g.importPackage("net/url")
+		g.importPackage("encoding/json")
 	}
 
 	if g.apiClientField != nil {
-		g.importPackages["net/url"] = struct{}{}
+		g.importPackage("net/url")
 
 		if *responseDataField != "" && g.responseDataType != nil {
 			// json is used for unmarshalling the response data
-			g.importPackages["encoding/json"] = struct{}{}
+			g.importPackage("encoding/json")
 		}
 	}
 
@@ -428,7 +428,7 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	if len(usedPkgNames) > 0 {
-		usedPkg, err := parsePackage(usedPkgNames, nil)
+		usedPkg, err := loadPackages(usedPkgNames, nil)
 		if err != nil {
 			log.WithError(err).Errorf("parse package error")
 			return
@@ -845,7 +845,7 @@ func main() {
 		importPackages:          map[string]struct{}{},
 	}
 
-	pkgs, err := parsePackage(args, tags)
+	pkgs, err := loadPackages(args, tags)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -930,7 +930,7 @@ func parseTypeSelector(sel string) (types.Object, error) {
 		return nil, err
 	}
 
-	packages, err := parsePackage([]string{ts.Package}, []string{})
+	packages, err := loadPackages([]string{ts.Package}, []string{})
 	if err != nil {
 		return nil, err
 	}
@@ -949,7 +949,7 @@ func parseTypeSelector(sel string) (types.Object, error) {
 	return nil, fmt.Errorf("can not find type matches the type selector %+v", sel)
 }
 
-func parsePackage(patterns []string, tags []string) ([]*packages.Package, error) {
+func loadPackages(patterns []string, tags []string) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports |
