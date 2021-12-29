@@ -52,7 +52,8 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 		return nil, errors.Wrapf(err,"invalid expression: %s", main)
 	}
 
-	if e, ok := e.(*ast.SelectorExpr); ok {
+	switch e := e.(type) {
+	case *ast.SelectorExpr:
 		x := unparen(e.X)
 
 		// Strip off star constructor, if any.
@@ -76,6 +77,8 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 				return sanitizeImport(&spec)
 			}
 		}
+	default:
+		return nil, fmt.Errorf("ast node is not a selector expr, %+v given", e)
 	}
 
 	return nil, fmt.Errorf("can not parse type selector: %s", main)
