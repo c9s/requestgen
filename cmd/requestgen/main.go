@@ -44,10 +44,10 @@ var (
 	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
 	apiUrlStr    = flag.String("url", "", "api url endpoint")
 
-	parameterType     = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
-	responseTypeSel   = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
-	responseDataTypeSel  = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
-	responseDataField = flag.String("responseDataField", "", "the field name of the inner data of the response type")
+	parameterType       = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
+	responseTypeSel     = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
+	responseDataTypeSel = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
+	responseDataField   = flag.String("responseDataField", "", "the field name of the inner data of the response type")
 
 	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
 	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
@@ -73,7 +73,7 @@ type Generator struct {
 	structTypeReceiverNames map[string]string
 
 	// TODO: clean up the package structure it's redundant
-	pkg *Package     // Package we are scanning.
+	pkg            *Package // Package we are scanning.
 	currentPackage *packages.Package
 	importPackages map[string]struct{}
 
@@ -92,6 +92,11 @@ type Generator struct {
 
 	// queryFields means query string
 	queryFields []Field
+}
+
+func (g *Generator) importPackage(pkg string) {
+	log.Debugf("add package import: %s", pkg)
+	g.importPackages[pkg] = struct{}{}
 }
 
 // addPackage adds a type checked Package and its syntax files to the generator.
@@ -402,19 +407,36 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
+	if len(g.fields) > 0 {
+		g.importPackages["fmt"] = struct{}{}
+		g.importPackages["net/url"] = struct{}{}
+		g.importPackages["encoding/json"] = struct{}{}
+	}
+
+	if g.apiClientField != nil {
+		g.importPackages["net/url"] = struct{}{}
+
+		if *responseDataField != "" && g.responseDataType != nil {
+			// json is used for unmarshalling the response data
+			g.importPackages["encoding/json"] = struct{}{}
+		}
+	}
+
 	var usedPkgNames []string
 	for n := range g.importPackages {
 		usedPkgNames = append(usedPkgNames, n)
 	}
 
-	usedPkg, err := parsePackage(usedPkgNames, nil)
-	if err != nil {
-		log.WithError(err).Errorf("parse package error")
-		return
-	}
+	if len(usedPkgNames) > 0 {
+		usedPkg, err := parsePackage(usedPkgNames, nil)
+		if err != nil {
+			log.WithError(err).Errorf("parse package error")
+			return
+		}
 
-	for _, pkg := range usedPkg {
-		usedImports[pkg.Name] = pkg.Types
+		for _, pkg := range usedPkg {
+			usedImports[pkg.Name] = pkg.Types
+		}
 	}
 
 	pkgTypes := g.pkg.pkg.Types
@@ -433,7 +455,6 @@ func (g *Generator) generate(typeName string) {
 		for _, ip := range pkgTypes.Imports() {
 			if other == ip {
 				log.Debugf("importing %s from %s, found imported %s", other.Path(), pkgTypes.Path(), ip)
-
 				usedImports[ip.Name()] = ip
 				return ip.Name()
 			}
@@ -449,8 +470,9 @@ func (g *Generator) generate(typeName string) {
 		types.TypeString(field.ArgType, qf)
 	}
 
-	var funcMap = templateFuncs(qf)
 
+
+	var funcMap = templateFuncs(qf)
 	if len(usedImports) > 0 {
 		g.printf("import (")
 		g.newline()
@@ -461,6 +483,7 @@ func (g *Generator) generate(typeName string) {
 		g.printf(")")
 		g.newline()
 	}
+
 
 	if err := g.generateSetters(funcMap, qf); err != nil {
 		log.Fatal(err)
@@ -535,18 +558,18 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 }
 `))
 	err := doFuncTemplate.Execute(&g.buf, struct {
-		StructType         types.Type
-		ReceiverName       string
-		ApiClientField     string
-		ApiMethod          string
-		ApiUrl             string
-		ResponseType,ResponseDataType       types.Type
-		ResponseDataField  string
-		HasQueryParameters bool
+		StructType                     types.Type
+		ReceiverName                   string
+		ApiClientField                 *string
+		ApiMethod                      string
+		ApiUrl                         string
+		ResponseType, ResponseDataType types.Type
+		ResponseDataField              string
+		HasQueryParameters             bool
 	}{
 		StructType:         g.structType,
 		ReceiverName:       g.receiverName,
-		ApiClientField:     *g.apiClientField,
+		ApiClientField:     g.apiClientField,
 		ApiMethod:          *apiMethodStr,
 		ApiUrl:             *apiUrlStr,
 		ResponseType:       g.responseType,
@@ -779,9 +802,6 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 }
 
 func main() {
-	log.Infof("%+v", os.Args)
-
-
 	flag.Parse()
 	if len(*typeNamesStr) == 0 {
 		flag.Usage()
@@ -791,6 +811,8 @@ func main() {
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	log.Debugf("args: %q", os.Args)
 
 	typeNames := strings.Split(*typeNamesStr, ",")
 	var tags []string
@@ -820,11 +842,7 @@ func main() {
 
 	g := Generator{
 		structTypeReceiverNames: map[string]string{},
-		importPackages: map[string]struct{}{
-			"fmt":           {},
-			"net/url":       {},
-			"encoding/json": {},
-		},
+		importPackages:          map[string]struct{}{},
 	}
 
 	pkgs, err := parsePackage(args, tags)
@@ -851,7 +869,7 @@ func main() {
 
 			g.responseType = o.Type()
 			if g.currentPackage.PkgPath != o.Pkg().Path() {
-				g.importPackages[o.Pkg().Path()] = struct{}{}
+				g.importPackage(o.Pkg().Path())
 			}
 		}
 	}
@@ -868,7 +886,7 @@ func main() {
 
 			g.responseDataType = o.Type()
 			if g.currentPackage.PkgPath != o.Pkg().Path() {
-				g.importPackages[o.Pkg().Path()] = struct{}{}
+				g.importPackage(o.Pkg().Path())
 			}
 		}
 	}
