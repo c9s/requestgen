@@ -13,6 +13,15 @@ go run ./cmd/requestgen -type PlaceOrderRequest -method GET -url "/api/v1/bullet
         ./example/api && \
             go test ./example/api || cat ./example/api/place_order_request_accessors.go
 
+
+(cd example/api &&
+go run ../../cmd/requestgen -type PlaceOrderRequest -method GET -url "/api/v1/bullet" -debug \
+        -responseType .Response \
+        -responseDataField Data \
+        -responseDataType .Order \
+        . && \
+            go test . || cat place_order_request_accessors.go)
+
 go run ./cmd/requestgen -type PlaceOrderRequest -method GET -url "/api/v1/bullet" -debug \
         -responseType 'interface{}' \
         ./example/api && \
