@@ -470,8 +470,6 @@ func (g *Generator) generate(typeName string) {
 		types.TypeString(field.ArgType, qf)
 	}
 
-
-
 	var funcMap = templateFuncs(qf)
 	if len(usedImports) > 0 {
 		g.printf("import (")
@@ -483,7 +481,6 @@ func (g *Generator) generate(typeName string) {
 		g.printf(")")
 		g.newline()
 	}
-
 
 	if err := g.generateSetters(funcMap, qf); err != nil {
 		log.Fatal(err)
@@ -511,6 +508,10 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 {{- end -}}
 	,error) {
 	{{ $recv := .ReceiverName }}
+  {{ $requestMethod := "NewRequest" }}
+  {{- if .ApiAuthenticated -}}
+    {{ $requestMethod = "NewAuthenticatedRequest" }}
+  {{- end -}}
 
 {{- if ne .ApiMethod "GET" }}
 	params, err := {{ $recv }}.GetParameters()
@@ -531,7 +532,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
   query := url.Values{}
 {{- end }}
 
-	req, err := {{ $recv }}.{{ .ApiClientField }}.NewRequest("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
+	req, err := {{ $recv }}.{{ .ApiClientField }}.{{ $requestMethod }}("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
 	if err != nil {
 		return nil, err
 	}
@@ -563,6 +564,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField                 *string
 		ApiMethod                      string
 		ApiUrl                         string
+		ApiAuthenticated               bool
 		ResponseType, ResponseDataType types.Type
 		ResponseDataField              string
 		HasQueryParameters             bool
@@ -572,6 +574,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField:     g.apiClientField,
 		ApiMethod:          *apiMethodStr,
 		ApiUrl:             *apiUrlStr,
+		ApiAuthenticated:   g.authenticatedApiClient,
 		ResponseType:       g.responseType,
 		ResponseDataType:   g.responseDataType,
 		ResponseDataField:  *responseDataField,
