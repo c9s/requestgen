@@ -407,11 +407,9 @@ func (g *Generator) generate(typeName string) {
 
 	var usedImports = map[string]*types.Package{}
 
-	if len(g.fields) > 0 {
-		g.importPackage("fmt")
-		g.importPackage("net/url")
-		g.importPackage("encoding/json")
-	}
+	g.importPackage("fmt")
+	g.importPackage("net/url")
+	g.importPackage("encoding/json")
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		g.importPackage("net/url")
@@ -558,9 +556,9 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	if err := json.Unmarshal(apiResponse.{{ .ResponseDataField }}, &data) ; err != nil {
 		return nil, err
 	}
-	return &data, nil
+	return {{ referenceByType .ResponseDataType -}} data, nil
 {{- else }}
-	return &apiResponse, nil
+	return {{ referenceByType .ResponseType -}} apiResponse, nil
 {{- end }}
 }
 `))
@@ -748,23 +746,21 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte,
 
 `))
 
-	if len(g.fields) > 0 {
-		err = parameterFuncTemplate.Execute(&g.buf, struct {
-			StructType   types.Type
-			ReceiverName string
-			Fields       []Field
-			QueryFields  []Field
-			Qualifier    types.Qualifier
-		}{
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
-			Fields:       g.fields,
-			QueryFields:  g.queryFields,
-			Qualifier:    qf,
-		})
-		if err != nil {
-			return err
-		}
+	err = parameterFuncTemplate.Execute(&g.buf, struct {
+		StructType   types.Type
+		ReceiverName string
+		Fields       []Field
+		QueryFields  []Field
+		Qualifier    types.Qualifier
+	}{
+		StructType:   g.structType,
+		ReceiverName: g.receiverName,
+		Fields:       g.fields,
+		QueryFields:  g.queryFields,
+		Qualifier:    qf,
+	})
+	if err != nil {
+		return err
 	}
 
 	return err
@@ -956,7 +952,6 @@ func parseTypeSelector(sel string) (types.Object, error) {
 		}
 
 		log.Debugf("ident %s matches type selector member %s", ident.Name, ts.Member)
-
 
 		if o.Pkg().Path() == ts.Package {
 			log.Debugf("package path matches %v == %v", o.Pkg().Path(), ts.Package)

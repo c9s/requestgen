@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/ast/astutil"
@@ -16,6 +17,7 @@ import (
 type TypeSelector struct {
 	Package string
 	Member  string
+	IsSlice bool
 }
 
 func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
@@ -41,15 +43,20 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 		return nil, errors.New("empty expression")
 	}
 
+	var spec TypeSelector
+
 	// dot references the current package
 	if main[0] == '.' {
 		main = `"."` + main
+	} else if strings.HasPrefix(main, "[]") {
+		// mark it as a slice
+		spec.IsSlice = true
+		main = main[2:]
 	}
 
-	var spec TypeSelector
 	e, err := parser.ParseExpr(main)
 	if err != nil {
-		return nil, errors.Wrapf(err,"invalid expression: %s", main)
+		return nil, errors.Wrapf(err, "invalid expression: %s", main)
 	}
 
 	switch e := e.(type) {

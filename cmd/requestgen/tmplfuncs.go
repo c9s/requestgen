@@ -4,6 +4,8 @@ import (
 	"go/types"
 	"strings"
 	"text/template"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func templateFuncs(qf types.Qualifier) template.FuncMap {
@@ -25,9 +27,24 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 		"typeTupleString": func(a *types.Tuple) interface{} {
 			return typeTupleString(a, false, qf)
 		},
-		"toPointer": func(a types.Type) types.Type {
-			switch a.(type) {
+		"referenceByType": func(a types.Type) string {
+			switch ua := a.Underlying().(type) {
+			case *types.Slice:
+				log.Debugf("type %v is types.Slice, do not use reference", ua)
+				return ""
 			case *types.Interface:
+				log.Debugf("type %v is types.Interface, do not use reference", ua)
+				return ""
+			}
+			return "&"
+		},
+		"toPointer": func(a types.Type) types.Type {
+			switch ua := a.Underlying().(type) {
+			case *types.Slice:
+				log.Debugf("type %v is types.Slice, do not use pointer", ua)
+				return a
+			case *types.Interface:
+				log.Debugf("type %v is types.Interface, do not use pointer", ua)
 				return a
 			}
 			return types.NewPointer(a)
