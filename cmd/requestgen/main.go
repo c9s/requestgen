@@ -164,10 +164,10 @@ func (g *Generator) checkClientInterface(field *ast.Field) {
 
 	// github.com/c9s/requestgen.APIClient
 	if typeValue.Type.String() == "github.com/c9s/requestgen.APIClient" {
-		log.Debugf("found APIClient field %v -> %+v", field.Names, typeValue.Type.String())
+		log.Debugf("found APIClient field %v -> %+v", field.Names[0], typeValue.Type.String())
 		g.apiClientField = &field.Names[0].Name
 	} else if typeValue.Type.String() == "github.com/c9s/requestgen.AuthenticatedAPIClient" {
-		log.Debugf("found AuthenticatedAPIClient field %v -> %+v", field.Names, typeValue.Type.String())
+		log.Debugf("found AuthenticatedAPIClient field %v -> %+v", field.Names[0], typeValue.Type.String())
 		g.apiClientField = &field.Names[0].Name
 		g.authenticatedApiClient = true
 	}
@@ -440,6 +440,7 @@ func (g *Generator) generate(typeName string) {
 
 	pkgTypes := g.pkg.pkg.Types
 	qf := func(other *types.Package) string {
+		var log = log.WithField("template-function", "qualifier")
 		if pkgTypes == other {
 			log.Debugf("importing %s from %s, same package object (pointer), no import", other.Path(), pkgTypes.Path())
 			return "" // same package; unqualified
@@ -459,8 +460,8 @@ func (g *Generator) generate(typeName string) {
 			}
 		}
 
-		log.Errorf("importing %s from %s, import not found", other.Path(), pkgTypes.Path())
-		return other.Path()
+		log.Warnf("importing %s from %s, import not found, using %s", other.Path(), pkgTypes.Path(), other.Name())
+		return other.Name()
 	}
 
 	// scan imports in the first run and use the qualifer to register the imports
@@ -489,6 +490,7 @@ func (g *Generator) generate(typeName string) {
 		log.Fatal(err)
 	}
 
+	log.Debugf("apiClientField: %v apiUrl: %v", g.apiClientField, apiUrlStr)
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		if err := g.generateDoMethod(funcMap); err != nil {
 			log.Fatal(err)
@@ -507,10 +509,10 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 {{- end -}}
 	,error) {
 	{{ $recv := .ReceiverName }}
-  {{ $requestMethod := "NewRequest" }}
-  {{- if .ApiAuthenticated -}}
-    {{ $requestMethod = "NewAuthenticatedRequest" }}
-  {{- end -}}
+    {{ $requestMethod := "NewRequest" }}
+    {{- if .ApiAuthenticated -}}
+    {{-    $requestMethod = "NewAuthenticatedRequest" }}
+    {{- end -}}
 
 {{- if not .HasParameters }}
     // no body params
@@ -942,18 +944,39 @@ func parseTypeSelector(sel string) (types.Object, error) {
 		return nil, err
 	}
 
+	if len(packages) == 0 {
+		return nil, fmt.Errorf("failed to load pacakges via the given type selector %+v", ts)
+	}
+
 	for ident, o := range packages[0].TypesInfo.Defs {
-		if ident.Name == ts.Member && o.Pkg().Path() == ts.Package {
+		if ident.Name != ts.Member {
+			continue
+		}
+
+		log.Debugf("ident %s matches type selector member %s", ident.Name, ts.Member)
+
+
+		if o.Pkg().Path() == ts.Package {
+			log.Debugf("package path matches %v == %v", o.Pkg().Path(), ts.Package)
+
 			switch t := o.Type().(type) {
 			case *types.Named:
 				log.Infof("found named type: %+v", t)
-				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o.Type(), o.Pkg().Path())
+				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o, o.Type(), o.Pkg().Path())
 				return o, nil
+
+			case *types.Struct:
+				log.Infof("found struct type: %+v", t)
+				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o, o.Type(), o.Pkg().Path())
+				return o, nil
+
+			default:
+				return nil, fmt.Errorf("can not parse type selector %v, unexpected type: %T %+v", ts, t, t)
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("can not find type matches the type selector %+v", sel)
+	return nil, fmt.Errorf("can not find type matches the type selector %+v in the packages %+v", sel, packages)
 }
 
 func loadPackages(patterns []string, tags []string) ([]*packages.Package, error) {
