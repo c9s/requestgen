@@ -531,7 +531,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
   query := url.Values{}
 {{- end }}
 
-	req, err := {{ $recv }}.{{ .ApiClientField }}.{{ $requestMethod }}("{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
+	req, err := {{ $recv }}.{{ .ApiClientField }}.{{ $requestMethod }}(ctx, "{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
 	if err != nil {
 		return nil, err
 	}

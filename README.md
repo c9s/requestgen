@@ -156,7 +156,7 @@ interface (defined in `requestgen.APIClient`)
 // APIClient defines the request builder method and request method for the API service
 type APIClient interface {
 	// NewRequest builds up the http request for public endpoints
-	NewRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
+	NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
 	// SendRequest sends the request object to the api gateway
 	SendRequest(req *http.Request) (*Response, error)
