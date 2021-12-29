@@ -35,6 +35,29 @@ func TestParseTypeSelector(t *testing.T) {
 			},
 		},
 		{
+			name: "slice",
+			args: args{
+				main: `[]APIClient`,
+			},
+			wantErr: false,
+			wantSpec: TypeSelector{
+				Package: "github.com/c9s/requestgen",
+				Member:  "APIClient",
+				IsSlice: true,
+			},
+		},
+		{
+			name: "ident",
+			args: args{
+				main: `APIClient`,
+			},
+			wantErr: false,
+			wantSpec: TypeSelector{
+				Package: "github.com/c9s/requestgen",
+				Member:  "APIClient",
+			},
+		},
+		{
 			name: "single dot",
 			args: args{
 				main: `.APIClient`,

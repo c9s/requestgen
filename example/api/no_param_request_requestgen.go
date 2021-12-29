@@ -4,8 +4,55 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/url"
 )
+
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (n *NoParamRequest) GetQueryParameters() (url.Values, error) {
+	var params = map[string]interface{}{}
+
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (n *NoParamRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
+func (n *NoParamRequest) GetParametersQuery() (url.Values, error) {
+	query := url.Values{}
+
+	params, err := n.GetParameters()
+	if err != nil {
+		return query, err
+	}
+
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
+func (n *NoParamRequest) GetParametersJSON() ([]byte, error) {
+	params, err := n.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
+}
 
 func (n *NoParamRequest) Do(ctx context.Context) (interface{}, error) {
 
@@ -27,5 +74,5 @@ func (n *NoParamRequest) Do(ctx context.Context) (interface{}, error) {
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
-	return &apiResponse, nil
+	return apiResponse, nil
 }

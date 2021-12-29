@@ -257,5 +257,5 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
-	return &apiResponse, nil
+	return apiResponse, nil
 }

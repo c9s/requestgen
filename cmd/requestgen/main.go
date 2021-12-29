@@ -869,12 +869,16 @@ func main() {
 		if *responseTypeSel == "interface{}" {
 			g.responseType = types.NewInterfaceType(nil, nil)
 		} else {
-			o, err := parseTypeSelector(*responseTypeSel)
+			o, ts, err := parseTypeSelector(*responseTypeSel)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			g.responseType = o.Type()
+			if ts.IsSlice {
+				g.responseType = types.NewSlice(o.Type())
+			} else {
+				g.responseType = o.Type()
+			}
 			if g.currentPackage.PkgPath != o.Pkg().Path() {
 				g.importPackage(o.Pkg().Path())
 			}
@@ -886,12 +890,17 @@ func main() {
 		if *responseDataTypeSel == "interface{}" {
 			g.responseDataType = types.NewInterfaceType(nil, nil)
 		} else {
-			o, err := parseTypeSelector(*responseDataTypeSel)
+			o, ts, err := parseTypeSelector(*responseDataTypeSel)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			g.responseDataType = o.Type()
+			if ts.IsSlice {
+				g.responseDataType = types.NewSlice(o.Type())
+			} else {
+				g.responseDataType = o.Type()
+			}
+
 			if g.currentPackage.PkgPath != o.Pkg().Path() {
 				g.importPackage(o.Pkg().Path())
 			}
@@ -931,12 +940,7 @@ func main() {
 	}
 }
 
-func parseTypeSelector(sel string) (types.Object, error) {
-	ts, err := requestgen.ParseTypeSelector(sel)
-	if err != nil {
-		return nil, err
-	}
-
+func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 	packages, err := loadPackages([]string{ts.Package}, []string{})
 	if err != nil {
 		return nil, err
@@ -946,26 +950,26 @@ func parseTypeSelector(sel string) (types.Object, error) {
 		return nil, fmt.Errorf("failed to load pacakges via the given type selector %+v", ts)
 	}
 
-	for ident, o := range packages[0].TypesInfo.Defs {
+	for ident, obj := range packages[0].TypesInfo.Defs {
 		if ident.Name != ts.Member {
 			continue
 		}
 
 		log.Debugf("ident %s matches type selector member %s", ident.Name, ts.Member)
 
-		if o.Pkg().Path() == ts.Package {
-			log.Debugf("package path matches %v == %v", o.Pkg().Path(), ts.Package)
+		if obj.Pkg().Path() == ts.Package {
+			log.Debugf("package path matches %v == %v", obj.Pkg().Path(), ts.Package)
 
-			switch t := o.Type().(type) {
+			switch t := obj.Type().(type) {
 			case *types.Named:
 				log.Infof("found named type: %+v", t)
-				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o, o.Type(), o.Pkg().Path())
-				return o, nil
+				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, obj, obj.Type(), obj.Pkg().Path())
+				return obj, nil
 
 			case *types.Struct:
 				log.Infof("found struct type: %+v", t)
-				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, o, o.Type(), o.Pkg().Path())
-				return o, nil
+				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, obj, obj.Type(), obj.Pkg().Path())
+				return obj, nil
 
 			default:
 				return nil, fmt.Errorf("can not parse type selector %v, unexpected type: %T %+v", ts, t, t)
@@ -973,7 +977,21 @@ func parseTypeSelector(sel string) (types.Object, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("can not find type matches the type selector %+v in the packages %+v", sel, packages)
+	return nil, fmt.Errorf("can not find type matches the type selector %+v in the packages %+v", ts, packages)
+}
+
+func parseTypeSelector(sel string) (types.Object, *requestgen.TypeSelector, error) {
+	ts, err := requestgen.ParseTypeSelector(sel)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	o, err := locateObject(ts)
+	if err != nil {
+		return nil, ts, err
+	}
+
+	return o, ts, nil
 }
 
 func loadPackages(patterns []string, tags []string) ([]*packages.Package, error) {

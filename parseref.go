@@ -49,9 +49,8 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 	if main[0] == '.' {
 		main = `"."` + main
 	} else if strings.HasPrefix(main, "[]") {
-		// mark it as a slice
-		spec.IsSlice = true
 		main = main[2:]
+		spec.IsSlice = true
 	}
 
 	e, err := parser.ParseExpr(main)
@@ -60,6 +59,11 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 	}
 
 	switch e := e.(type) {
+	case *ast.Ident:
+		spec.Package = "."
+		spec.Member = e.Name
+		return sanitizeImport(&spec)
+
 	case *ast.SelectorExpr:
 		x := unparen(e.X)
 
@@ -85,13 +89,15 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 			}
 		}
 	default:
-		return nil, fmt.Errorf("ast node is not a selector expr, %+v given", e)
+		return nil, fmt.Errorf("expression is not an ident, selector expr or slice expr, %+v given", e)
 	}
 
 	return nil, fmt.Errorf("can not parse type selector: %s", main)
 }
 
-func unparen(e ast.Expr) ast.Expr { return astutil.Unparen(e) }
+func unparen(e ast.Expr) ast.Expr {
+	return astutil.Unparen(e)
+}
 
 func parseImportPath(e ast.Expr) string {
 	switch e := e.(type) {
