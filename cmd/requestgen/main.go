@@ -972,7 +972,8 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 				return obj, nil
 
 			default:
-				return nil, fmt.Errorf("can not parse type selector %v, unexpected type: %T %+v", ts, t, t)
+				continue
+				// return nil, fmt.Errorf("can not parse type selector %v, unexpected type: %T %+v", ts, t, t)
 			}
 		}
 	}
