@@ -10,7 +10,8 @@ go get github.com/c9s/requestgen/cmd/requestgen
 
 ## Usage
 
-`requestgen` scans all the fields of the target struct, and generate setter methods and getParameters method.
+`requestgen` scans all the fields of the target struct, and generate setter
+methods and getParameters method.
 
 ```go
 package api
@@ -92,11 +93,35 @@ And then use the type selector like this:
 
 ```shell
 # if the type is in a relative package
-requestgen -responseType '"./example/api".Response'
+requestgen ... -responseType '"./example/api".Response'
 
 # if the type is in the same package
-requestgen -responseType '".".Response'
+requestgen ... -responseType '".".Response'
 ```
+
+
+When using requestgen with go:generate, you should handle the quote escaping
+for the type selector, for example:
+
+
+```go
+//go:generate requestgen -type PlaceOrderRequest -responseType "\".\".Response" -responseDataField Data -responseDataType "\".\"Order"
+```
+
+But don't worry about the escaping, the above selector can be simplified as:
+
+```go
+//go:generate requestgen -type PlaceOrderRequest -responseType .Response -responseDataField Data -responseDataType .Order
+```
+
+If you want to reference a type defined in an external package, you can pass
+something like `"net/url".Response` as the type selector, but it needs to be
+escaped like this:
+
+```go
+//go:generate requestgen -type PlaceOrderRequest -responseType "\"net/url\".Response"
+```
+
 
 `-responseDataField [dataField]`
 
@@ -124,7 +149,8 @@ When `dataType` is given, it means your data is inside the `responseType`. the r
 
 ## APIClient
 
-You can implement your own http API client struct that satisfies the following interface (defined in `requestgen.APIClient`)
+You can implement your own http API client struct that satisfies the following
+interface (defined in `requestgen.APIClient`)
 
 ```
 // APIClient defines the request builder method and request method for the API service
