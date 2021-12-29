@@ -84,7 +84,7 @@ type Order struct {
 	TradeType     string `json:"tradeType"`
 }
 
-//go:generate requestgen -type PlaceOrderRequest -responseType ".".Response -responseDataField Data -responseDataType Order
+//go:generate go run ../../cmd/requestgen -type PlaceOrderRequest -responseType .Response -responseDataField Data -responseDataType .Order
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
 

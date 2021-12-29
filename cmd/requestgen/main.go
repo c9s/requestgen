@@ -779,6 +779,9 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 }
 
 func main() {
+	log.Infof("%+v", os.Args)
+
+
 	flag.Parse()
 	if len(*typeNamesStr) == 0 {
 		flag.Usage()

@@ -34,6 +34,17 @@ func TestParseTypeSelector(t *testing.T) {
 				Member:  "APIClient",
 			},
 		},
+		{
+			name: "single dot",
+			args: args{
+				main: `.APIClient`,
+			},
+			wantErr: false,
+			wantSpec: TypeSelector{
+				Package: "github.com/c9s/requestgen",
+				Member:  "APIClient",
+			},
+		},
 	}
 
 	for _, tt := range tests {

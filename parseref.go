@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
@@ -35,14 +36,19 @@ func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
 }
 
 func ParseTypeSelector(main string) (*TypeSelector, error) {
+	if len(main) == 0 {
+		return nil, errors.New("empty expression")
+	}
+
+	// dot references the current package
+	if main[0] == '.' {
+		main = `"."` + main
+	}
+
 	var spec TypeSelector
-
-	e, _ := parser.ParseExpr(main)
-
-	if pkg := parseImportPath(e); pkg != "" {
-		// e.g. bytes or "encoding/json": a package
-		spec.Package = pkg
-		return &spec, nil
+	e, err := parser.ParseExpr(main)
+	if err != nil {
+		return nil, errors.Wrapf(err,"invalid expression: %s", main)
 	}
 
 	if e, ok := e.(*ast.SelectorExpr); ok {
@@ -71,7 +77,7 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("can not parse type selector: %q", main)
+	return nil, fmt.Errorf("can not parse type selector: %s", main)
 }
 
 func unparen(e ast.Expr) ast.Expr { return astutil.Unparen(e) }
