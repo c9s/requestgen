@@ -20,10 +20,11 @@ import "github.com/c9s/requestgen"
 
 //go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
-	// client is an optional field to implement
-	// if you add this field with the APIClient interface type, the Do() method will be generated
+	// client is an optional field to implement.
+	// If the API needs authentication, the client type should be `AuthenticatedAPIClient`. Otherwise, `APIClient`.
+	// The `Do()` method will be generated if the client field is provided.
 	// note, you will have to add flag "-url" and "-method" to specify your endpoint and the request method.
-	client requestgen.APIClient
+	client requestgen.AuthenticatedAPIClient
 	
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
