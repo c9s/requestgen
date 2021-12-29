@@ -166,11 +166,9 @@ func (g *Generator) checkClientInterface(field *ast.Field) {
 	if typeValue.Type.String() == "github.com/c9s/requestgen.APIClient" {
 		log.Debugf("found APIClient field %v -> %+v", field.Names, typeValue.Type.String())
 		g.apiClientField = &field.Names[0].Name
-		g.importPackages["context"] = struct{}{}
 	} else if typeValue.Type.String() == "github.com/c9s/requestgen.AuthenticatedAPIClient" {
 		log.Debugf("found AuthenticatedAPIClient field %v -> %+v", field.Names, typeValue.Type.String())
 		g.apiClientField = &field.Names[0].Name
-		g.importPackages["context"] = struct{}{}
 		g.authenticatedApiClient = true
 	}
 }
@@ -413,8 +411,9 @@ func (g *Generator) generate(typeName string) {
 		g.importPackage("encoding/json")
 	}
 
-	if g.apiClientField != nil {
+	if g.apiClientField != nil && *apiUrlStr != "" {
 		g.importPackage("net/url")
+		g.importPackage("context")
 
 		if *responseDataField != "" && g.responseDataType != nil {
 			// json is used for unmarshalling the response data
