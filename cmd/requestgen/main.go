@@ -512,13 +512,16 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
     {{ $requestMethod = "NewAuthenticatedRequest" }}
   {{- end -}}
 
-{{- if ne .ApiMethod "GET" }}
+{{- if not .HasParameters }}
+    // no body params
+	var params interface{}
+{{- else if and .HasParameters (ne .ApiMethod "GET") }}
 	params, err := {{ $recv }}.GetParameters()
 	if err != nil {
 		return nil, err
 	}
 {{- else }}
-  // empty params for GET operation
+    // empty params for GET operation
 	var params interface{}
 {{- end }}
 
@@ -566,6 +569,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiAuthenticated               bool
 		ResponseType, ResponseDataType types.Type
 		ResponseDataField              string
+		HasParameters                  bool
 		HasQueryParameters             bool
 	}{
 		StructType:         g.structType,
@@ -577,6 +581,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ResponseType:       g.responseType,
 		ResponseDataType:   g.responseDataType,
 		ResponseDataField:  *responseDataField,
+		HasParameters:      len(g.fields) > 0,
 		HasQueryParameters: len(g.queryFields) > 0,
 	})
 
