@@ -9,11 +9,11 @@ import (
 
 func (n *NoParamRequest) Do(ctx context.Context) (interface{}, error) {
 
-	// empty params for GET operation
+	// no body params
 	var params interface{}
 	query := url.Values{}
 
-	req, err := n.client.NewRequest("GET", "/v1/bullet", query, params)
+	req, err := n.client.NewRequest(ctx, "GET", "/v1/bullet", query, params)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -54,7 +55,7 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	body, err := castPayload(payload)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,7 @@ func (c *RestClient) NewRequest(method, refURL string, params url.Values, payloa
 	}
 
 	pathURL := c.BaseURL.ResolveReference(rel)
-	return http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
+	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 }
 
 // SendRequest sends the request to the API server and handle the response
@@ -95,7 +96,7 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -124,7 +125,7 @@ func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.V
 		return nil, err
 	}
 
-	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

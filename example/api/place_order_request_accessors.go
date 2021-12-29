@@ -243,7 +243,7 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	req, err := p.client.NewRequest("GET", "/api/v1/bullet", query, params)
+	req, err := p.client.NewRequest(ctx, "GET", "/api/v1/bullet", query, params)
 	if err != nil {
 		return nil, err
 	}
