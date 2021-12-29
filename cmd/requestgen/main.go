@@ -300,6 +300,11 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			return
 		}
 
+		defaultValue, err := parseDefaultTag(tags, fieldName, argKind)
+		if err != nil {
+			return
+		}
+
 		f := Field{
 			Name:               field.Names[0].Name,
 			Type:               typeValue.Type,
@@ -314,6 +319,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			Optional:           optional,
 			Required:           required,
 			ValidValues:        validValues,
+			Default:            defaultValue,
 			DefaultValuer:      defaultValuer,
 
 			File: file,

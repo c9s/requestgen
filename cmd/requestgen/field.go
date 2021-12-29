@@ -49,6 +49,33 @@ type Field struct {
 	ValidValues interface{}
 }
 
+func parseDefaultTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {
+	defaultTag, _ := tags.Get("default")
+	if defaultTag == nil {
+		return nil, nil
+	}
+
+	var defaultValue interface{}
+	var defaultValueStr = defaultTag.Value()
+
+	logrus.Debugf("%s found default value: %v", fieldName, defaultValueStr)
+
+	switch argKind {
+	case types.Int, types.Int64, types.Int32:
+			i, err := strconv.Atoi(defaultValueStr)
+			if err != nil {
+				return nil, err
+			}
+			defaultValue = i
+
+	case types.String:
+		defaultValue = defaultValueStr
+
+	}
+
+	return defaultValue, nil
+}
+
 func parseValidValuesTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {
 	validValuesTag, _ := tags.Get("validValues")
 	if validValuesTag == nil {
