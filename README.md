@@ -70,7 +70,7 @@ err := req.Tag(..).
 
 See the [generated example](./example/api/place_order_request_accessors.go)
 
-See the [real world application](/c9s/bbgo/blob/main/pkg/exchange/kucoin/kucoinapi/marketdata.go#L3)
+See the [real world application](https://github.com/c9s/bbgo/blob/main/pkg/exchange/kucoin/kucoinapi/marketdata.go#L3)
 
 ## Command Options
 
