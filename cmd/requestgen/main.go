@@ -53,6 +53,8 @@ var (
 	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
 )
 
+var outputSuffix = "_requestgen.go"
+
 // File holds a single parsed file and associated data.
 type File struct {
 	pkg  *Package  // Package to which this file belongs.
@@ -922,7 +924,7 @@ func main() {
 		if outputName == "" {
 			ss := camelcase.Split(typeNames[0])
 			fn := strings.Join(ss, "_")
-			baseName := fmt.Sprintf("%s_accessors.go", fn)
+			baseName := fmt.Sprintf("%s%s", fn, outputSuffix)
 			outputName = filepath.Join(dir, strings.ToLower(baseName))
 		}
 		err = ioutil.WriteFile(outputName, src, 0644)
