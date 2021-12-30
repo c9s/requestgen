@@ -65,11 +65,11 @@ func parseDefaultTag(tags *structtag.Tags, fieldName string, argKind types.Basic
 
 	switch argKind {
 	case types.Int, types.Int64, types.Int32:
-			i, err := strconv.Atoi(defaultValueStr)
-			if err != nil {
-				return nil, err
-			}
-			defaultValue = i
+		i, err := strconv.Atoi(defaultValueStr)
+		if err != nil {
+			return nil, err
+		}
+		defaultValue = i
 
 	case types.String:
 		defaultValue = defaultValueStr
@@ -109,4 +109,3 @@ func parseValidValuesTag(tags *structtag.Tags, fieldName string, argKind types.B
 
 	return validValues, nil
 }
-

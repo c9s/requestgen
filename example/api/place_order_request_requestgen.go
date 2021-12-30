@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"net/url"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -106,6 +107,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
+
 	}
 	// check symbol field -> json key symbol
 	symbol := p.symbol
@@ -203,6 +205,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+
 	}
 
 	return params, nil
@@ -234,6 +237,36 @@ func (p *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
 	return json.Marshal(params)
 }
 
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func (p *PlaceOrderRequest) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+func (p *PlaceOrderRequest) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func (p *PlaceOrderRequest) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := p.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
+}
+
 func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 
 	// empty params for GET operation
@@ -243,7 +276,9 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	req, err := p.client.NewRequest(ctx, "GET", "/api/v1/bullet", query, params)
+	apiURL := "/api/v1/bullet"
+
+	req, err := p.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}

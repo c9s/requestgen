@@ -271,9 +271,9 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		isSlug := paramTag.HasOption("slug")
 
 		if isTime {
-			g.importPackages["time"] = struct{}{}
+			g.importPackage("time")
 			if isMillisecondsTime || isSecondsTime {
-				g.importPackages["strconv"] = struct{}{}
+				g.importPackage("strconv")
 			}
 		}
 
@@ -288,9 +288,9 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			defaultValuer = defaultTag.Value()
 			switch defaultValuer {
 			case "now()":
-				g.importPackages["time"] = struct{}{}
+				g.importPackage("time")
 			case "uuid()":
-				g.importPackages["github.com/google/uuid"] = struct{}{}
+				g.importPackage("github.com/google/uuid")
 
 			}
 		}
@@ -422,6 +422,7 @@ func (g *Generator) generate(typeName string) {
 	g.importPackage("fmt")
 	g.importPackage("net/url")
 	g.importPackage("encoding/json")
+	g.importPackage("regexp")
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		g.importPackage("net/url")
@@ -548,7 +549,18 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
   query := url.Values{}
 {{- end }}
 
-	req, err := {{ $recv }}.{{ .ApiClientField }}.{{ $requestMethod }}(ctx, "{{ .ApiMethod }}", "{{ .ApiUrl }}", query, params)
+	apiURL := "{{ .ApiUrl }}"
+
+	{{- if .HasSlugs }}
+	slugs, err := {{ $recv }}.GetSlugsMap()
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL = {{ $recv }}.applySlugsToUrl(apiURL, slugs)
+	{{- end }}
+
+	req, err := {{ $recv }}.{{ .ApiClientField }}.{{ $requestMethod }}(ctx, "{{ .ApiMethod }}", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
@@ -583,6 +595,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiAuthenticated               bool
 		ResponseType, ResponseDataType types.Type
 		ResponseDataField              string
+		HasSlugs                       bool
 		HasParameters                  bool
 		HasQueryParameters             bool
 	}{
@@ -595,6 +608,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ResponseType:       g.responseType,
 		ResponseDataType:   g.responseDataType,
 		ResponseDataField:  *responseDataField,
+		HasSlugs:           len(g.slugs) > 0,
 		HasParameters:      len(g.fields) > 0,
 		HasQueryParameters: len(g.queryFields) > 0,
 	})
@@ -698,6 +712,7 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 	return query, nil
 }
 
+
 // GetParameters builds and checks the parameters and return the result in a map object
 func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
@@ -714,7 +729,9 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 
 		{{ template "assign" . }}
 	} {{- if .DefaultValuer }} else {
+
 		{{ template "assign-default" . }}
+
 	} {{- end }}
 {{- else }}
 	{{ .Name }} := {{- $recv }}.{{ .Name }}
@@ -756,19 +773,80 @@ func ({{- $recv }} *{{ typeString .StructType -}} ) GetParametersJSON() ([]byte,
 	return json.Marshal(params)
 }
 
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+{{- range .Slugs }}
+	// check {{ .Name }} field -> json key {{ .JsonKey }}
+{{- if .Optional }}
+	if {{ $recv }}.{{ .Name }} != nil {
+		{{ .Name }} := *{{- $recv }}.{{ .Name }}
+
+		{{ template "check-required" . }}
+
+		{{ template "check-valid-values" . }}
+
+		{{ template "assign" . }}
+
+	} {{- if .DefaultValuer }} else {
+
+		{{ template "assign-default" . }}
+
+	} {{- end }}
+{{- else }}
+	{{ .Name }} := {{- $recv }}.{{ .Name }}
+
+	{{ template "check-required" . }}
+
+	{{ template "check-valid-values" . }}
+
+	{{ template "assign" . }}
+{{- end }}
+{{- end }}
+
+	return params, nil
+}
+
+func ({{- $recv }} * {{- typeString .StructType -}} ) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := {{ $recv }}.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
+}
+
+
+
+
 `))
 
 	err = parameterFuncTemplate.Execute(&g.buf, struct {
-		StructType   types.Type
-		ReceiverName string
-		Fields       []Field
-		QueryFields  []Field
-		Qualifier    types.Qualifier
+		StructType                 types.Type
+		ReceiverName               string
+		QueryFields, Fields, Slugs []Field
+		Qualifier                  types.Qualifier
 	}{
 		StructType:   g.structType,
 		ReceiverName: g.receiverName,
 		Fields:       g.fields,
 		QueryFields:  g.queryFields,
+		Slugs:        g.slugs,
 		Qualifier:    qf,
 	})
 	if err != nil {
@@ -806,6 +884,18 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 	}
 
 	for _, field := range g.fields {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:        field,
+			Qualifier:    qf,
+			StructType:   g.structType,
+			ReceiverName: g.receiverName,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, field := range g.slugs {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:        field,
 			Qualifier:    qf,
