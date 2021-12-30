@@ -48,6 +48,9 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 	// dot references the current package
 	if main[0] == '.' {
 		main = `"."` + main
+	} else if strings.HasPrefix(main, ".[]") {
+		main = main[3:]
+		spec.IsSlice = true
 	} else if strings.HasPrefix(main, "[]") {
 		main = main[2:]
 		spec.IsSlice = true
