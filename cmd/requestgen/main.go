@@ -94,6 +94,8 @@ type Generator struct {
 
 	// queryFields means query string
 	queryFields []Field
+
+	slugs []Field
 }
 
 func (g *Generator) importPackage(pkg string) {
@@ -266,6 +268,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		isMillisecondsTime := paramTag.HasOption("milliseconds")
 		isSecondsTime := paramTag.HasOption("seconds")
 		isQuery := paramTag.HasOption("query")
+		isSlug := paramTag.HasOption("slug")
 
 		if isTime {
 			g.importPackages["time"] = struct{}{}
@@ -308,6 +311,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		f := Field{
 			Name:               field.Names[0].Name,
 			Type:               typeValue.Type,
+			IsSlug:             isSlug,
 			ArgType:            argType,
 			SetterName:         setterName,
 			IsString:           isString,
@@ -326,7 +330,9 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		}
 
 		// query parameters
-		if isQuery {
+		if isSlug {
+			g.slugs = append(g.slugs, f)
+		} else if isQuery {
 			g.queryFields = append(g.queryFields, f)
 		} else {
 			g.fields = append(g.fields, f)

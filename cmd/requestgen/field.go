@@ -13,6 +13,9 @@ import (
 type Field struct {
 	Name string
 
+	// IsSlug is used in the url as a template placeholder (the field name will be the placeholder ID).
+	IsSlug bool
+
 	Type types.Type
 
 	// ArgType is the argument type of the setter
