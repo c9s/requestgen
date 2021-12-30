@@ -1,6 +1,8 @@
 # requestgen
 
+<!--
 [![Go Report Card](https://goreportcard.com/badge/github.com/c9s/requestgen)](https://goreportcard.com/report/github.com/c9s/requestgen)
+-->
 
 requestgen generates the cascade call for your request object
 
