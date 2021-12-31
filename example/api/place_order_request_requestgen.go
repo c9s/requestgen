@@ -94,17 +94,19 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if p.clientOrderID != nil {
 		clientOrderID := *p.clientOrderID
 
+		// TEMPLATE check-required
 		if len(clientOrderID) == 0 {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
+		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
+
 	} else {
 
 		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
-
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 
@@ -112,9 +114,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check symbol field -> json key symbol
 	symbol := p.symbol
 
+	// TEMPLATE check-required
 	if len(symbol) == 0 {
 		return params, fmt.Errorf("symbol is required, empty string given")
 	}
+	// END TEMPLATE check-required
 
 	// assign parameter of symbol
 	params["symbol"] = symbol
@@ -124,14 +128,18 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tag
 		params["tag"] = tag
+
 	}
 	// check side field -> json key side
 	side := p.side
 
+	// TEMPLATE check-required
 	if len(side) == 0 {
 		return params, fmt.Errorf("side is required, empty string given")
 	}
+	// END TEMPLATE check-required
 
+	// TEMPLATE check-valid-values
 	switch side {
 	case "buy", "sell":
 		params["side"] = side
@@ -140,12 +148,20 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		return params, fmt.Errorf("side value %v is invalid", side)
 
 	}
+	// END TEMPLATE check-valid-values
 
 	// assign parameter of side
 	params["side"] = side
 	// check ordType field -> json key ordType
 	ordType := p.ordType
 
+	// TEMPLATE check-required
+	if len(ordType) == 0 {
+		ordType = "limit"
+	}
+	// END TEMPLATE check-required
+
+	// TEMPLATE check-valid-values
 	switch ordType {
 	case "limit", "market":
 		params["ordType"] = ordType
@@ -154,6 +170,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		return params, fmt.Errorf("ordType value %v is invalid", ordType)
 
 	}
+	// END TEMPLATE check-valid-values
 
 	// assign parameter of ordType
 	params["ordType"] = ordType
@@ -168,11 +185,13 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of price
 		params["price"] = price
+
 	}
 	// check timeInForce field -> json key timeInForce
 	if p.timeInForce != nil {
 		timeInForce := *p.timeInForce
 
+		// TEMPLATE check-valid-values
 		switch timeInForce {
 		case "GTC", "GTT", "FOK":
 			params["timeInForce"] = timeInForce
@@ -181,9 +200,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 			return params, fmt.Errorf("timeInForce value %v is invalid", timeInForce)
 
 		}
+		// END TEMPLATE check-valid-values
 
 		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
+
 	}
 	// check complexArg field -> json key complexArg
 	complexArg := p.complexArg
@@ -197,6 +218,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+
 	} else {
 
 		// assign default of startTime

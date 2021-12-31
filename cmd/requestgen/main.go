@@ -291,7 +291,9 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 				g.importPackage("time")
 			case "uuid()":
 				g.importPackage("github.com/google/uuid")
-
+			default:
+				log.Errorf("invalid default valuer: %v", defaultValuer)
+				return
 			}
 		}
 
@@ -625,20 +627,31 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 
 {{- define "check-required" }}
 {{- if .Required }}
+	// TEMPLATE check-required
 	{{- if .IsString }}
 	if len({{ .Name }}) == 0 {
-		 return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
+		{{- if .Default }}
+        {{ .Name }} = {{ .Default | printf "%q" }}
+		{{- else }}
+		return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
+		{{- end }}
 	}
 	{{- else if .IsInt }}
 	if {{ .Name }} == 0 {
-		 return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+		{{- if .Default }}
+		{{ .Name }} = {{ .Default }}
+		{{- else }}
+		return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+		{{- end }}
 	}
 	{{- end }}
+	// END TEMPLATE check-required
 {{- end }}
 {{- end }}
 
 {{- define "check-valid-values" }}
 	{{- if .ValidValues }}
+	// TEMPLATE check-valid-values
 	switch {{ .Name }} {
 		case {{ toGoTupleString .ValidValues }}:
 			params[ "{{- .JsonKey -}}" ] = {{ .Name }}
@@ -647,6 +660,7 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 			return params, fmt.Errorf("{{ .JsonKey }} value %v is invalid", {{ .Name }})
 
 	}
+	// END TEMPLATE check-valid-values
 	{{- end }}
 {{- end }}
 
@@ -670,7 +684,14 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 	{{ template "assign" . }}
 	{{- else if eq .DefaultValuer "uuid()" }}
 	{{ .Name }} := uuid.New().String()
-	{{ template "assign" . }}
+	{{- template "assign" . }}
+	{{- else if .Default }}
+		{{- if .IsInt }}
+			{{ .Name }} := {{ .Default }}
+		{{- else if .IsString }}
+			{{ .Name }} := {{ .Default | printf "%q" }}
+		{{- end }}
+	{{- template "assign" . }}
 	{{- end }}
 {{- end }}
 
@@ -728,6 +749,7 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 		{{ template "check-valid-values" . }}
 
 		{{ template "assign" . }}
+
 	} {{- if .DefaultValuer }} else {
 
 		{{ template "assign-default" . }}
@@ -1064,7 +1086,7 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 
 			switch t := obj.Type().(type) {
 			case *types.Named:
-				log.Infof("found named type: %+v", t)
+				log.Debugf("found named type: %+v", t)
 				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, obj, obj.Type(), obj.Pkg().Path())
 				return obj, nil
 
