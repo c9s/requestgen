@@ -77,6 +77,7 @@ func (p *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
 
 		// assign parameter of page
 		params["page"] = page
+	} else {
 	}
 
 	query := url.Values{}
@@ -102,14 +103,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
-
 	} else {
-
 		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
-
 	}
 	// check symbol field -> json key symbol
 	symbol := p.symbol
@@ -128,7 +126,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tag
 		params["tag"] = tag
-
+	} else {
 	}
 	// check side field -> json key side
 	side := p.side
@@ -185,7 +183,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of price
 		params["price"] = price
-
+	} else {
 	}
 	// check timeInForce field -> json key timeInForce
 	if p.timeInForce != nil {
@@ -204,7 +202,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
-
+	} else {
 	}
 	// check complexArg field -> json key complexArg
 	complexArg := p.complexArg
@@ -218,16 +216,13 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
-
 	} else {
-
 		// assign default of startTime
 		startTime := time.Now()
 
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
-
 	}
 
 	return params, nil

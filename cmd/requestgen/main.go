@@ -710,9 +710,18 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 		{{ template "check-valid-values" . }}
 
 		{{ template "assign" . }}
-	} {{- if .DefaultValuer }} else {
-		{{ template "assign-default" . }}
-	} {{- end }}
+	} else {
+		{{- if .DefaultValuer }}
+			{{- template "assign-default" . }}
+		{{- else if .Default }}
+			{{- if .IsInt }}
+			{{ .Name }} := {{ .Default }}
+			{{- else if .IsString }}
+			{{ .Name }} := {{ .Default | printf "%q" }}
+			{{- end }}
+		{{- end }}
+	}
+
 {{- else }}
 	{{ .Name }} := {{- $recv }}.{{ .Name }}
 
@@ -740,6 +749,7 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 
 {{- range .Fields }}
 	// check {{ .Name }} field -> json key {{ .JsonKey }}
+
 {{- if .Optional }}
 	if {{ $recv }}.{{ .Name }} != nil {
 		{{ .Name }} := *{{- $recv }}.{{ .Name }}
@@ -749,12 +759,18 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 		{{ template "check-valid-values" . }}
 
 		{{ template "assign" . }}
+	} else {
+		{{- if .DefaultValuer }}
+			{{- template "assign-default" . }}
+		{{- else if .Default }}
+			{{- if .IsInt }}
+			{{ .Name }} := {{ .Default }}
+			{{- else if .IsString }}
+			{{ .Name }} := {{ .Default | printf "%q" }}
+			{{- end }}
+		{{- end }}
+	}
 
-	} {{- if .DefaultValuer }} else {
-
-		{{ template "assign-default" . }}
-
-	} {{- end }}
 {{- else }}
 	{{ .Name }} := {{- $recv }}.{{ .Name }}
 
