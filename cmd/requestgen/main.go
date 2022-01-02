@@ -633,7 +633,7 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 		{{- if .Default }}
         {{ .Name }} = {{ .Default | printf "%q" }}
 		{{- else }}
-		return params, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
+		return nil, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
 		{{- end }}
 	}
 	{{- else if .IsInt }}
@@ -641,7 +641,7 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 		{{- if .Default }}
 		{{ .Name }} = {{ .Default }}
 		{{- else }}
-		return params, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+		return nil, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
 		{{- end }}
 	}
 	{{- end }}
