@@ -657,7 +657,7 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 			params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 
 		default:
-			return params, fmt.Errorf("{{ .JsonKey }} value %v is invalid", {{ .Name }})
+			return nil, fmt.Errorf("{{ .JsonKey }} value %v is invalid", {{ .Name }})
 
 	}
 	// END TEMPLATE check-valid-values
