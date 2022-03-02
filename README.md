@@ -165,6 +165,45 @@ type Response struct {
 
 When `dataType` is given, it means your data is inside the `responseType`. the raw json message will be decoded with this given type.
 
+## Placing parameter in the request query
+
+```
+//go:generate GetRequest -url "/api/orders" -type GetOpenOrdersRequest -responseDataType []Order
+type GetOpenOrdersRequest struct {
+	client requestgen.AuthenticatedAPIClient
+	market string `param:"market,query"`
+}
+
+func (c *RestClient) NewGetOpenOrdersRequest(market string) *GetOpenOrdersRequest {
+	return &GetOpenOrdersRequest{
+		client: c,
+		market: market,
+	}
+}
+```
+
+## Placing parameter in the request path
+
+```
+//go:generate requestgen -method DELETE -url "/api/orders/:orderID" -type CancelOrderRequest -responseType .APIResponse
+type CancelOrderRequest struct {
+	client  requestgen.AuthenticatedAPIClient
+	orderID string `param:"orderID,required,slug"`
+}
+
+func (c *RestClient) NewCancelOrderRequest(orderID string) *CancelOrderRequest {
+	return &CancelOrderRequest{
+		client:  c,
+		orderID: orderID,
+	}
+}
+```
+
+
+
+
+
+
 
 ## APIClient
 
