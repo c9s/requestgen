@@ -691,7 +691,7 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 		{{- else if .IsString }}
 			{{ .Name }} := {{ .Default | printf "%q" }}
 		{{- end }}
-	{{- template "assign" . }}
+		{{- template "assign" . }}
 	{{- end }}
 {{- end }}
 
@@ -768,6 +768,7 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParameters() (map[strin
 			{{- else if .IsString }}
 			{{ .Name }} := {{ .Default | printf "%q" }}
 			{{- end }}
+			{{ template "assign" . }}
 		{{- end }}
 	}
 
