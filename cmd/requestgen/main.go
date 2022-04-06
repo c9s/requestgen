@@ -1098,8 +1098,9 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 
 		log.Debugf("ident %s matches type selector member %s", ident.Name, ts.Member)
 
+		log.Debugf("comparing package path %v == %v", obj.Pkg().Path(), ts.Package)
 		if obj.Pkg().Path() == ts.Package {
-			log.Debugf("package path matches %v == %v", obj.Pkg().Path(), ts.Package)
+			log.Debugf("package path matched")
 
 			switch t := obj.Type().(type) {
 			case *types.Named:
@@ -1113,6 +1114,7 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 				return obj, nil
 
 			default:
+				log.Warnf("object type %T of %v is unexpected", t, t)
 				continue
 				// return nil, fmt.Errorf("can not parse type selector %v, unexpected type: %T %+v", ts, t, t)
 			}
