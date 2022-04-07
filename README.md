@@ -72,7 +72,7 @@ err := req.Tag(..).
 	Do(ctx)
 ```
 
-See the [generated example](./example/api/place_order_request_accessors.go)
+See the [generated example](./example/api/place_order_request_requestgen.go)
 
 See the [real world application](https://github.com/c9s/bbgo/blob/main/pkg/exchange/kucoin/kucoinapi/marketdata.go#L3)
 
