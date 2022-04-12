@@ -719,6 +719,7 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 			{{- else if .IsString }}
 			{{ .Name }} := {{ .Default | printf "%q" }}
 			{{- end }}
+		    {{ template "assign" . }}
 		{{- end }}
 	}
 
