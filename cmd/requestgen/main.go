@@ -547,6 +547,11 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
+{{- else if and .HasParameters (eq .ApiMethod "GET") }}
+	query, err := {{ $recv }}.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 {{- else }}
   query := url.Values{}
 {{- end }}
