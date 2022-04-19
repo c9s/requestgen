@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"regexp"
 )
 
@@ -39,7 +40,13 @@ func (n *NoParamRequest) GetParametersQuery() (url.Values, error) {
 	}
 
 	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+		if n.isVarSlice(v) {
+			n.iterateSlice(v, func(it interface{}) {
+				query.Add(k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(k, fmt.Sprintf("%v", v))
+		}
 	}
 
 	return query, nil
@@ -69,6 +76,23 @@ func (n *NoParamRequest) applySlugsToUrl(url string, slugs map[string]string) st
 	}
 
 	return url
+}
+
+func (n *NoParamRequest) iterateSlice(slice interface{}, f func(it interface{})) {
+	sliceValue := reflect.ValueOf(slice)
+	for i := 0; i < sliceValue.Len(); i++ {
+		it := sliceValue.Index(i).Interface()
+		f(it)
+	}
+}
+
+func (n *NoParamRequest) isVarSlice(v interface{}) bool {
+	rt := reflect.TypeOf(v)
+	switch rt.Kind() {
+	case reflect.Slice:
+		return true
+	}
+	return false
 }
 
 func (n *NoParamRequest) GetSlugsMap() (map[string]string, error) {

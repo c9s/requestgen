@@ -425,6 +425,7 @@ func (g *Generator) generate(typeName string) {
 	g.importPackage("net/url")
 	g.importPackage("encoding/json")
 	g.importPackage("regexp")
+	g.importPackage("reflect")
 
 	if g.apiClientField != nil && *apiUrlStr != "" {
 		g.importPackage("net/url")
@@ -802,7 +803,13 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParametersQuery() (url.
 	}
 
 	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+		if {{ $recv }}.isVarSlice(v) {
+			{{ $recv }}.iterateSlice(v, func(it interface{}) {
+				query.Add(k + "[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(k, fmt.Sprintf("%v", v))
+		}
 	}
 
 	return query, nil
@@ -862,6 +869,24 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) applySlugsToUrl(url string
 	return url
 }
 
+func ({{- $recv }} * {{- typeString .StructType -}} ) iterateSlice(slice interface{}, f func(it interface{})) {
+	sliceValue := reflect.ValueOf(slice)
+	for i := 0; i < sliceValue.Len(); i++ {
+		it := sliceValue.Index(i).Interface() 
+		f(it)
+	}
+}
+
+func ({{- $recv }} * {{- typeString .StructType -}} ) isVarSlice(v interface{}) bool {
+	rt := reflect.TypeOf(v)
+	switch rt.Kind() {
+        case reflect.Slice:
+			return true
+	}
+	return false
+}
+
+
 func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugsMap() (map[string]string, error) {
 	slugs := map[string]string{}
 	params, err := {{ $recv }}.GetSlugParameters()
@@ -875,8 +900,6 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugsMap() (map[string]
 
 	return slugs, nil
 }
-
-
 
 
 `))

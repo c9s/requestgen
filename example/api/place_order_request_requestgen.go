@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"time"
@@ -97,7 +98,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// TEMPLATE check-required
 		if len(clientOrderID) == 0 {
-			return params, fmt.Errorf("clientOid is required, empty string given")
+			return nil, fmt.Errorf("clientOid is required, empty string given")
 		}
 		// END TEMPLATE check-required
 
@@ -114,7 +115,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(symbol) == 0 {
-		return params, fmt.Errorf("symbol is required, empty string given")
+		return nil, fmt.Errorf("symbol is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
@@ -133,7 +134,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(side) == 0 {
-		return params, fmt.Errorf("side is required, empty string given")
+		return nil, fmt.Errorf("side is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
@@ -143,7 +144,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		params["side"] = side
 
 	default:
-		return params, fmt.Errorf("side value %v is invalid", side)
+		return nil, fmt.Errorf("side value %v is invalid", side)
 
 	}
 	// END TEMPLATE check-valid-values
@@ -165,7 +166,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		params["ordType"] = ordType
 
 	default:
-		return params, fmt.Errorf("ordType value %v is invalid", ordType)
+		return nil, fmt.Errorf("ordType value %v is invalid", ordType)
 
 	}
 	// END TEMPLATE check-valid-values
@@ -195,7 +196,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 			params["timeInForce"] = timeInForce
 
 		default:
-			return params, fmt.Errorf("timeInForce value %v is invalid", timeInForce)
+			return nil, fmt.Errorf("timeInForce value %v is invalid", timeInForce)
 
 		}
 		// END TEMPLATE check-valid-values
@@ -238,7 +239,13 @@ func (p *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	}
 
 	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+		if p.isVarSlice(v) {
+			p.iterateSlice(v, func(it interface{}) {
+				query.Add(k+"[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(k, fmt.Sprintf("%v", v))
+		}
 	}
 
 	return query, nil
@@ -268,6 +275,23 @@ func (p *PlaceOrderRequest) applySlugsToUrl(url string, slugs map[string]string)
 	}
 
 	return url
+}
+
+func (p *PlaceOrderRequest) iterateSlice(slice interface{}, f func(it interface{})) {
+	sliceValue := reflect.ValueOf(slice)
+	for i := 0; i < sliceValue.Len(); i++ {
+		it := sliceValue.Index(i).Interface()
+		f(it)
+	}
+}
+
+func (p *PlaceOrderRequest) isVarSlice(v interface{}) bool {
+	rt := reflect.TypeOf(v)
+	switch rt.Kind() {
+	case reflect.Slice:
+		return true
+	}
+	return false
 }
 
 func (p *PlaceOrderRequest) GetSlugsMap() (map[string]string, error) {
