@@ -1289,7 +1289,7 @@ func loadPackages(patterns []string, tags []string) ([]*packages.Package, error)
 	defer p.stop()
 
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
+		Mode: packages.NeedName | packages.NeedFiles |
 			packages.NeedImports |
 			packages.NeedTypes |
 			packages.NeedSyntax | packages.NeedTypesInfo |
