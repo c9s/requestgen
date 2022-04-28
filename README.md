@@ -207,6 +207,22 @@ func (c *RestClient) NewCancelOrderRequest(orderID string) *CancelOrderRequest {
 
 ## APIClient
 
+requestgen provides a base HTTP client, if your application does not need to get authenticated, you can use it directly:
+
+```
+baseURL, err := url.Parse("https://api.binance.com")
+ctx := context.Background()
+apiClient := &BaseAPIClient{
+    BaseURL:    baseURL,
+}
+
+req, err := apiClient.NewRequest(ctx, "GET", "/api/v3/ping", nil , nil)
+resp, err := apiClient.SendRequest(req)
+```
+
+You can also embed requestgen.BaseAPIClient into your own APIClient struct.
+
+
 You can implement your own http API client struct that satisfies the following
 interface (defined in `requestgen.APIClient`)
 
