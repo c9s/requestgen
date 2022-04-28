@@ -510,26 +510,25 @@ func (g *Generator) generate(typeName string) {
 	defer p.stop()
 
 	// collect the fields and types
-	for _, file := range g.pkg.files {
-		if file.file == nil {
-			continue
-		}
+	profile("astTraverse", func() {
+		for _, file := range g.pkg.files {
+			if file.file == nil {
+				continue
+			}
 
-		profile("receiverNameWalker", func() {
 			ast.Inspect(file.file, g.receiverNameWalker(typeName, file))
-		})
-
-		profile("stringTypesCollectorWalker", func() {
 			ast.Inspect(file.file, g.stringTypesCollectorWalker(typeName, file))
-		})
-	}
-
-	for _, file := range g.pkg.files {
-		if file.file == nil {
-			continue
 		}
-		ast.Inspect(file.file, g.requestStructWalker(typeName, file))
-	}
+
+		profile("requestStructWalker", func() {
+			for _, file := range g.pkg.files {
+				if file.file == nil {
+					continue
+				}
+				ast.Inspect(file.file, g.requestStructWalker(typeName, file))
+			}
+		})
+	})
 
 	// conf := types.Config{Importer: importer.Default()}
 
@@ -568,8 +567,8 @@ func (g *Generator) generate(typeName string) {
 		}
 	}
 
-	pkgTypes := g.pkg.pkg.Types
 	qf := func(other *types.Package) string {
+		var pkgTypes = g.pkg.pkg.Types
 		var log = log.WithField("template-function", "qualifier")
 		if pkgTypes == other {
 			log.Debugf("importing %s from %s, same package object (pointer), no import", other.Path(), pkgTypes.Path())
@@ -1292,7 +1291,7 @@ func loadPackages(patterns []string, tags []string) ([]*packages.Package, error)
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports |
-			packages.NeedTypes | packages.NeedTypesSizes |
+			packages.NeedTypes |
 			packages.NeedSyntax | packages.NeedTypesInfo |
 			packages.NeedDeps,
 		Tests:      false,
