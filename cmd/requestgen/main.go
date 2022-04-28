@@ -389,7 +389,7 @@ func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func
 	return func(node ast.Node) bool {
 		switch decl := node.(type) {
 		case *ast.TypeSpec:
-			log.Printf("TypeSpec: name %s type: %+v\n", decl.Name.String(), decl.Type)
+			log.Debugf("TypeSpec: name %s type: %+v\n", decl.Name.String(), decl.Type)
 			if n, ok := isIdent(decl.Type); ok {
 				switch n {
 				case "string", "int", "int8", "int16", "int32", "int64":
@@ -399,7 +399,7 @@ func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func
 			}
 
 		case *ast.ValueSpec:
-			log.Printf("ValueSpec: parsing type %+v names: %+v values: %+v\n", decl.Type, decl.Names, decl.Values)
+			log.Debugf("ValueSpec: parsing type %+v names: %+v values: %+v\n", decl.Type, decl.Names, decl.Values)
 			if typeValue, ok := g.pkg.pkg.TypesInfo.Types[decl.Type]; ok {
 				fullQualifiedTypeName := typeValue.Type.String()
 
@@ -492,7 +492,7 @@ type Profile struct {
 
 func (p *Profile) stop() {
 	du := time.Now().Sub(p.startTime)
-	log.Printf("profile: %s: %s", p.task, du)
+	log.Debugf("profile: %s: %s", p.task, du)
 }
 
 func profile(task string, f func()) {
