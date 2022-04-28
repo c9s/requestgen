@@ -742,8 +742,8 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 {{- end }}
 
 	query := url.Values{}
-	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+	for _k, _v := range params {
+		query.Add(_k, fmt.Sprintf("%v", _v))
 	}
 
 	return query, nil
@@ -802,13 +802,13 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetParametersQuery() (url.
 		return query, err
 	}
 
-	for k, v := range params {
-		if {{ $recv }}.isVarSlice(v) {
-			{{ $recv }}.iterateSlice(v, func(it interface{}) {
-				query.Add(k + "[]", fmt.Sprintf("%v", it))
+	for _k, _v := range params {
+		if {{ $recv }}.isVarSlice(_v) {
+			{{ $recv }}.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k + "[]", fmt.Sprintf("%v", it))
 			})
 		} else {
-			query.Add(k, fmt.Sprintf("%v", v))
+			query.Add(_k, fmt.Sprintf("%v", _v))
 		}
 	}
 
@@ -861,24 +861,24 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugParameters() (map[s
 }
 
 func ({{- $recv }} * {{- typeString .StructType -}} ) applySlugsToUrl(url string, slugs map[string]string) string {
-	for k, v := range slugs {
-		needleRE := regexp.MustCompile(":" + k + "\\b")
-		url = needleRE.ReplaceAllString(url, v)
+	for _k, _v := range slugs {
+		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		url = needleRE.ReplaceAllString(url, _v)
 	}
 
 	return url
 }
 
-func ({{- $recv }} * {{- typeString .StructType -}} ) iterateSlice(slice interface{}, f func(it interface{})) {
+func ({{- $recv }} * {{- typeString .StructType -}} ) iterateSlice(slice interface{}, _f func(it interface{})) {
 	sliceValue := reflect.ValueOf(slice)
-	for i := 0; i < sliceValue.Len(); i++ {
-		it := sliceValue.Index(i).Interface() 
-		f(it)
+	for _i := 0; _i < sliceValue.Len(); _i++ {
+		it := sliceValue.Index(_i).Interface() 
+		_f(it)
 	}
 }
 
-func ({{- $recv }} * {{- typeString .StructType -}} ) isVarSlice(v interface{}) bool {
-	rt := reflect.TypeOf(v)
+func ({{- $recv }} * {{- typeString .StructType -}} ) isVarSlice(_v interface{}) bool {
+	rt := reflect.TypeOf(_v)
 	switch rt.Kind() {
         case reflect.Slice:
 			return true
@@ -894,8 +894,8 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugsMap() (map[string]
 		return slugs, nil
 	}
 
-	for k, v := range params {
-		slugs[k] = fmt.Sprintf("%v", v)
+	for _k, _v := range params {
+		slugs[_k] = fmt.Sprintf("%v", _v)
 	}
 
 	return slugs, nil
