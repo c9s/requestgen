@@ -18,6 +18,9 @@ func isDirectory(name string) bool {
 }
 
 func formatBuffer(buf bytes.Buffer) []byte {
+	p := newProfile("formatSource")
+	defer p.stop()
+
 	src, err := format.Source(buf.Bytes())
 	if err != nil {
 		// Should never happen, but can arise when developing this code.
