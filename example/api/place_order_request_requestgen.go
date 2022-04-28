@@ -140,7 +140,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-valid-values
 	switch side {
-	case "buy", "sell":
+	case SideTypeBuy, SideTypeSell:
 		params["side"] = side
 
 	default:

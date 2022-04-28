@@ -7,6 +7,14 @@ import (
 	"github.com/c9s/requestgen"
 )
 
+type WalletType int
+
+const (
+	WalletTypeSpot WalletType = 0
+	WalletTypeMargin WalletType = 1
+	WalletTypeFunding WalletType = 2
+)
+
 type SideType string
 
 const (
@@ -97,7 +105,7 @@ type PlaceOrderRequest struct {
 	tag *string `param:"tag"`
 
 	// "buy" or "sell"
-	side SideType `param:"side,required" validValues:"buy,sell"`
+	side SideType `param:"side,required"`
 
 	ordType OrderType `param:"ordType,required" validValues:"limit,market" default:"limit"`
 

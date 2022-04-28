@@ -24,8 +24,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/fatih/camelcase"
 	"github.com/fatih/structtag"
@@ -96,6 +98,11 @@ type Generator struct {
 	queryFields []Field
 
 	slugs []Field
+
+	simpleTypes          map[string]string
+	simpleTypeValueNames map[string][]Literal
+	stringTypeValues     map[string][]string
+	intTypeValues        map[string][]int64
 }
 
 func (g *Generator) importPackage(pkg string) {
@@ -303,6 +310,21 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		validValues, err := parseValidValuesTag(tags, fieldName, argKind)
 		if err != nil {
 			return
+		} else if validValues == nil {
+			if values, ok := g.simpleTypeValueNames[argType.String()]; ok {
+				validValues = values
+			} else {
+				// use built-in validator for simple types
+				if isTypeString(argType) {
+					if values, ok := g.stringTypeValues[argType.String()]; ok {
+						validValues = values
+					}
+				} else if isTypeInt(argType) {
+					if values, ok := g.intTypeValues[argType.String()]; ok {
+						validValues = values
+					}
+				}
+			}
 		}
 
 		defaultValue, err := parseDefaultTag(tags, fieldName, argKind)
@@ -354,6 +376,69 @@ func (g *Generator) receiverNameWalker(typeName string, file *File) func(ast.Nod
 	}
 }
 
+func isIdent(expr ast.Expr) (string, bool) {
+	switch dt := expr.(type) {
+	case *ast.Ident:
+		return dt.Name, true
+	}
+
+	return "", false
+}
+
+func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func(ast.Node) bool {
+	return func(node ast.Node) bool {
+		switch decl := node.(type) {
+		case *ast.TypeSpec:
+			log.Printf("TypeSpec: name %s type: %+v\n", decl.Name.String(), decl.Type)
+			if n, ok := isIdent(decl.Type); ok {
+				switch n {
+				case "string", "int", "int8", "int16", "int32", "int64":
+					g.simpleTypes[decl.Name.String()] = n
+					log.Debugf("simple type %s = %s", decl.Name.String(), n)
+				}
+			}
+
+		case *ast.ValueSpec:
+			log.Printf("ValueSpec: parsing type %+v names: %+v values: %+v\n", decl.Type, decl.Names, decl.Values)
+			if typeValue, ok := g.pkg.pkg.TypesInfo.Types[decl.Type]; ok {
+				fullQualifiedTypeName := typeValue.Type.String()
+
+				for _, n := range decl.Names {
+					g.simpleTypeValueNames[fullQualifiedTypeName] = append(g.simpleTypeValueNames[fullQualifiedTypeName], Literal(n.String()))
+				}
+				log.Debugf("simpleTypeValueNames %s = %+v", fullQualifiedTypeName, g.simpleTypeValueNames[fullQualifiedTypeName])
+
+				if isTypeString(typeValue.Type) {
+					for _, v := range decl.Values {
+						if basic, ok := v.(*ast.BasicLit); ok {
+							g.stringTypeValues[fullQualifiedTypeName] = append(g.stringTypeValues[fullQualifiedTypeName], basic.Value)
+						}
+					}
+					log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.stringTypeValues[fullQualifiedTypeName])
+				} else if isTypeInt(typeValue.Type) {
+					for _, v := range decl.Values {
+						if basic, ok := v.(*ast.BasicLit); ok {
+							ii, err := strconv.ParseInt(basic.Value, 10, 64)
+							if err != nil {
+								log.WithError(err).Errorf("can not parse int %s", basic.Value)
+							} else {
+								g.intTypeValues[fullQualifiedTypeName] = append(g.intTypeValues[fullQualifiedTypeName], ii)
+							}
+						}
+					}
+					log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.intTypeValues[fullQualifiedTypeName])
+				}
+			}
+
+		case *ast.FuncDecl, *ast.FuncType:
+			// ignore function blocks
+			return false
+		}
+
+		return true
+	}
+}
+
 // requestStructWalker returns an ast node iterator function for iterating the ast nodes
 func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.Node) bool {
 	return func(node ast.Node) bool {
@@ -398,7 +483,22 @@ func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.No
 
 		return true
 	}
+}
 
+type Profile struct {
+	task      string
+	startTime time.Time
+}
+
+func (p *Profile) stop() {
+	du := time.Now().Sub(p.startTime)
+	log.Printf("profile: %s: %s", p.task, du)
+}
+
+func profile(task string, f func()) {
+	p := &Profile{task: task, startTime: time.Now()}
+	f()
+	p.stop()
 }
 
 func (g *Generator) generate(typeName string) {
@@ -407,7 +507,14 @@ func (g *Generator) generate(typeName string) {
 		if file.file == nil {
 			continue
 		}
-		ast.Inspect(file.file, g.receiverNameWalker(typeName, file))
+
+		profile("receiverNameWalker", func() {
+			ast.Inspect(file.file, g.receiverNameWalker(typeName, file))
+		})
+
+		profile("stringTypesCollectorWalker", func() {
+			ast.Inspect(file.file, g.stringTypesCollectorWalker(typeName, file))
+		})
 	}
 
 	for _, file := range g.pkg.files {
@@ -1020,6 +1127,10 @@ func main() {
 	g := Generator{
 		structTypeReceiverNames: map[string]string{},
 		importPackages:          map[string]struct{}{},
+		simpleTypes:             make(map[string]string),
+		simpleTypeValueNames:    make(map[string][]Literal),
+		stringTypeValues:        make(map[string][]string),
+		intTypeValues:           make(map[string][]int64),
 	}
 
 	pkgs, err := loadPackages(args, tags)

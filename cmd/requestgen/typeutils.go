@@ -69,22 +69,6 @@ func getUnderlyingType(a types.Type) types.Type {
 	return a
 }
 
-func isTypeInt(a types.Type) bool {
-	a = getUnderlyingType(a)
-	switch ua := a.(type) {
-
-	case *types.Basic:
-		switch ua.Kind() {
-		case types.Int, types.Int32, types.Int64:
-			return true
-
-		}
-
-	}
-
-	return false
-}
-
 func getBasicKind(a types.Type) types.BasicKind {
 	a = getUnderlyingType(a)
 	switch ua := a.(type) {
@@ -96,13 +80,27 @@ func getBasicKind(a types.Type) types.BasicKind {
 	return 0
 }
 
+func isTypeInt(a types.Type) bool {
+	a = getUnderlyingType(a)
+	basic, ok := a.(*types.Basic)
+	if !ok {
+		return false
+	}
+
+	switch basic.Kind() {
+	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64:
+		return true
+
+	}
+
+	return false
+}
+
 func isTypeString(a types.Type) bool {
 	a = getUnderlyingType(a)
-	switch ua := a.(type) {
-
-	case *types.Basic:
-		return ua.Kind() == types.String
-
+	basic, ok := a.(*types.Basic)
+	if ok {
+		return basic.Kind() == types.String
 	}
 
 	return false
@@ -129,6 +127,8 @@ func debugUnderlying(k string, a types.Type) {
 	}
 }
 
+type Literal string
+
 // toGoTupleString converts type to go literal tuple
 func toGoTupleString(a interface{}) string {
 	switch v := a.(type) {
@@ -145,6 +145,13 @@ func toGoTupleString(a interface{}) string {
 			qs = append(qs, strconv.Quote(s))
 		}
 		return strings.Join(qs, ", ")
+
+	case []Literal:
+		var ss []string
+		for _, s := range v {
+			ss = append(ss, string(s))
+		}
+		return strings.Join(ss, ", ")
 
 	default:
 		panic(fmt.Errorf("unsupported type: %+v", v))
@@ -173,4 +180,3 @@ func typeParamsTuple(a types.Type) *types.Tuple {
 
 	}
 }
-

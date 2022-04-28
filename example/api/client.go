@@ -24,8 +24,7 @@ const RestBaseURL = "https://api.kucoin.com/api"
 const SandboxRestBaseURL = "https://openapi-sandbox.kucoin.com/api"
 
 type RestClient struct {
-	BaseURL *url.URL
-	client *http.Client
+	requestgen.BaseAPIClient
 
 	Key, Secret, Passphrase string
 	KeyVersion              string
@@ -37,62 +36,21 @@ func NewClient() *RestClient {
 		panic(err)
 	}
 
-	client := &RestClient{
-		BaseURL:    u,
-		KeyVersion: "2",
-		client: &http.Client{
-			Timeout: defaultHTTPTimeout,
+	return &RestClient{
+		BaseAPIClient: requestgen.BaseAPIClient{
+			BaseURL: u,
+			HttpClient: &http.Client{
+				Timeout: defaultHTTPTimeout,
+			},
 		},
+		KeyVersion: "2",
 	}
-
-	return client
 }
 
 func (c *RestClient) Auth(key, secret, passphrase string) {
 	c.Key = key
 	c.Secret = secret
 	c.Passphrase = passphrase
-}
-
-// NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		rel.RawQuery = params.Encode()
-	}
-
-	pathURL := c.BaseURL.ResolveReference(rel)
-	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
-}
-
-// SendRequest sends the request to the API server and handle the response
-func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// newResponse reads the response body and return a new Response object
-	response, err := requestgen.NewResponse(resp)
-	if err != nil {
-		return response, err
-	}
-
-	// Check error, if there is an error, return the ErrorResponse struct type
-	if response.IsError() {
-		return response, errors.New(string(response.Body))
-	}
-
-	return response, nil
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.
