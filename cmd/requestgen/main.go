@@ -495,6 +495,10 @@ func (p *Profile) stop() {
 	log.Debugf("profile: %s: %s", p.task, du)
 }
 
+func newProfile(task string) *Profile {
+	return &Profile{task: task, startTime: time.Now()}
+}
+
 func profile(task string, f func()) {
 	p := &Profile{task: task, startTime: time.Now()}
 	f()
@@ -502,6 +506,9 @@ func profile(task string, f func()) {
 }
 
 func (g *Generator) generate(typeName string) {
+	p := newProfile(fmt.Sprintf("generate: %v", typeName))
+	defer p.stop()
+
 	// collect the fields and types
 	for _, file := range g.pkg.files {
 		if file.file == nil {
@@ -1279,6 +1286,9 @@ func parseTypeSelector(sel string) (types.Object, *requestgen.TypeSelector, erro
 }
 
 func loadPackages(patterns []string, tags []string) ([]*packages.Package, error) {
+	p := newProfile(fmt.Sprintf("loadPackages: %v", patterns))
+	defer p.stop()
+
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports |
