@@ -571,19 +571,21 @@ func (g *Generator) generate(typeName string) {
 		var pkgTypes = g.pkg.pkg.Types
 		var log = log.WithField("template-function", "qualifier")
 		if pkgTypes == other {
-			log.Debugf("importing %s from %s, same package object (pointer), no import", other.Path(), pkgTypes.Path())
+			log.Debugf("importing %s from %s: same package object (pointer), no import", other.Path(), pkgTypes.Path())
 			return "" // same package; unqualified
 		}
 
 		if other.Path() == g.currentPackage.PkgPath {
-			log.Debugf("importing %s from %s, same package path, no import", other.Path(), pkgTypes.Path())
+			log.Debugf("importing %s from %s: same package path, no import", other.Path(), pkgTypes.Path())
 			return ""
 		}
 
 		// solve imports
 		for _, ip := range pkgTypes.Imports() {
-			if other == ip {
-				log.Debugf("importing %s from %s, found imported %s", other.Path(), pkgTypes.Path(), ip)
+			log.Debugf("checking import %+v == other(%+v)", ip, other)
+			// XXX: check Name() too?
+			if other.Path() == ip.Path() {
+				log.Debugf("importing %s from %s: found imported %s", other.Path(), pkgTypes.Path(), ip)
 				usedImports[ip.Name()] = ip
 				return ip.Name()
 			}
@@ -593,11 +595,13 @@ func (g *Generator) generate(typeName string) {
 		return other.Name()
 	}
 
-	// scan imports in the first run and use the qualifer to register the imports
+	// scan imports in the first run and use the qualifier to register the imports
 	for _, field := range g.fields {
 		// reference the types that we will use in our template
 		types.TypeString(field.ArgType, qf)
 	}
+	types.TypeString(g.responseType, qf)
+	types.TypeString(g.responseDataType, qf)
 
 	var funcMap = templateFuncs(qf)
 	if len(usedImports) > 0 {
@@ -1249,6 +1253,7 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 			log.Debugf("package path matched")
 
 			switch t := obj.Type().(type) {
+
 			case *types.Named:
 				log.Debugf("found named type: %+v", t)
 				log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, obj, obj.Type(), obj.Pkg().Path())
