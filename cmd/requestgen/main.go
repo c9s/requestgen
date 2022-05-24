@@ -400,34 +400,37 @@ func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func
 
 		case *ast.ValueSpec:
 			log.Debugf("ValueSpec: parsing type %+v names: %+v values: %+v\n", decl.Type, decl.Names, decl.Values)
-			if typeValue, ok := g.pkg.pkg.TypesInfo.Types[decl.Type]; ok {
-				fullQualifiedTypeName := typeValue.Type.String()
+			typeValue, ok := g.pkg.pkg.TypesInfo.Types[decl.Type]
+			if !ok {
+				log.Debugf("types info %v (%v) not found", decl.Names, decl.Type)
+				return false
+			}
 
-				for _, n := range decl.Names {
-					g.simpleTypeValueNames[fullQualifiedTypeName] = append(g.simpleTypeValueNames[fullQualifiedTypeName], Literal(n.String()))
+			fullQualifiedTypeName := typeValue.Type.String()
+			for _, n := range decl.Names {
+				g.simpleTypeValueNames[fullQualifiedTypeName] = append(g.simpleTypeValueNames[fullQualifiedTypeName], Literal(n.String()))
+			}
+			log.Debugf("simpleTypeValueNames %s = %+v", fullQualifiedTypeName, g.simpleTypeValueNames[fullQualifiedTypeName])
+
+			if isTypeString(typeValue.Type) {
+				for _, v := range decl.Values {
+					if basic, ok := v.(*ast.BasicLit); ok {
+						g.stringTypeValues[fullQualifiedTypeName] = append(g.stringTypeValues[fullQualifiedTypeName], basic.Value)
+					}
 				}
-				log.Debugf("simpleTypeValueNames %s = %+v", fullQualifiedTypeName, g.simpleTypeValueNames[fullQualifiedTypeName])
-
-				if isTypeString(typeValue.Type) {
-					for _, v := range decl.Values {
-						if basic, ok := v.(*ast.BasicLit); ok {
-							g.stringTypeValues[fullQualifiedTypeName] = append(g.stringTypeValues[fullQualifiedTypeName], basic.Value)
+				log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.stringTypeValues[fullQualifiedTypeName])
+			} else if isTypeInt(typeValue.Type) {
+				for _, v := range decl.Values {
+					if basic, ok := v.(*ast.BasicLit); ok {
+						ii, err := strconv.ParseInt(basic.Value, 10, 64)
+						if err != nil {
+							log.WithError(err).Errorf("can not parse int %s", basic.Value)
+						} else {
+							g.intTypeValues[fullQualifiedTypeName] = append(g.intTypeValues[fullQualifiedTypeName], ii)
 						}
 					}
-					log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.stringTypeValues[fullQualifiedTypeName])
-				} else if isTypeInt(typeValue.Type) {
-					for _, v := range decl.Values {
-						if basic, ok := v.(*ast.BasicLit); ok {
-							ii, err := strconv.ParseInt(basic.Value, 10, 64)
-							if err != nil {
-								log.WithError(err).Errorf("can not parse int %s", basic.Value)
-							} else {
-								g.intTypeValues[fullQualifiedTypeName] = append(g.intTypeValues[fullQualifiedTypeName], ii)
-							}
-						}
-					}
-					log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.intTypeValues[fullQualifiedTypeName])
 				}
+				log.Debugf("ValueSpec: type %+v values: %s %+v", decl.Type, fullQualifiedTypeName, g.intTypeValues[fullQualifiedTypeName])
 			}
 
 		case *ast.FuncDecl, *ast.FuncType:
