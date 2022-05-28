@@ -151,6 +151,10 @@ func (g *Generator) registerReceiverNameOfType(decl *ast.FuncDecl) bool {
 		return false
 	}
 
+	if len(receiver.Names) == 0 {
+		return false
+	}
+
 	// use ident to look up type
 	// typeDef := g.pkg.pkg.TypesInfo.Defs[receiver.Names[0]]
 
