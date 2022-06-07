@@ -10,8 +10,8 @@ import (
 type WalletType int
 
 const (
-	WalletTypeSpot WalletType = 0
-	WalletTypeMargin WalletType = 1
+	WalletTypeSpot    WalletType = 0
+	WalletTypeMargin  WalletType = 1
 	WalletTypeFunding WalletType = 2
 )
 
@@ -50,13 +50,13 @@ type ComplexArg struct {
 }
 
 type Response struct {
-	Code    string          `json:"code"`
-	Message string          `json:"msg"`
-	CurrentPage int `json:"currentPage"`
-	PageSize    int `json:"pageSize"`
-	TotalNum    int `json:"totalNum"`
-	TotalPage   int `json:"totalPage"`
-	Data    json.RawMessage `json:"data"`
+	Code        string          `json:"code"`
+	Message     string          `json:"msg"`
+	CurrentPage int             `json:"currentPage"`
+	PageSize    int             `json:"pageSize"`
+	TotalNum    int             `json:"totalNum"`
+	TotalPage   int             `json:"totalPage"`
+	Data        json.RawMessage `json:"data"`
 }
 
 type Order struct {
@@ -92,6 +92,15 @@ type Order struct {
 	TradeType     string `json:"tradeType"`
 }
 
+// PlaceOrderRequest
+//go:generate go run ../../cmd/requesttestgen -type PlaceOrderRequest
+// TestCase #1 - Place BTCUSDT Limit Buy Order
+// ===========================================
+// Input:
+//   (&PlaceOrderRequest{}).Symbol("BTCUSDT").Side(SideTypeBuy)
+// ExpectedResponse:
+//   file: "place_order_response.json"
+//
 //go:generate go run ../../cmd/requestgen -debug -type PlaceOrderRequest -responseType .Response -responseDataField Data -responseDataType .Order
 type PlaceOrderRequest struct {
 	client requestgen.APIClient

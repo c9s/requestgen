@@ -472,6 +472,8 @@ func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.No
 					return true
 				}
 
+				// typeSpec.Comment.List
+
 				// if the matched type is not a struct type, we should skip
 				structType, ok := typeSpec.Type.(*ast.StructType)
 				if !ok {
