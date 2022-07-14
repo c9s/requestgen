@@ -35,6 +35,8 @@ type Field struct {
 
 	IsMillisecondsTime, IsSecondsTime bool
 
+	TimeFormat string
+
 	// SetterName is the method name of the setter
 	SetterName string
 

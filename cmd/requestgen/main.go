@@ -308,6 +308,12 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			}
 		}
 
+		var timeFormat string
+		timeFormatTag, _ := tags.Get("timeFormat")
+		if timeFormatTag != nil {
+			timeFormat = timeFormatTag.Value()
+		}
+
 		fieldName := field.Names[0].Name
 		debugUnderlying(fieldName, argType)
 
@@ -347,6 +353,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			IsTime:             isTime,
 			IsMillisecondsTime: isMillisecondsTime,
 			IsSecondsTime:      isSecondsTime,
+			TimeFormat:         timeFormat,
 			JsonKey:            jsonKey,
 			Optional:           optional,
 			Required:           required,
@@ -802,6 +809,8 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 {{- else if and .IsTime .IsSecondsTime }}
 	// convert time.Time to seconds time stamp
 	params[ "{{- .JsonKey -}}" ] = strconv.FormatInt({{ .Name }}.Unix(), 10)
+{{- else if and .IsTime .TimeFormat }}
+	params[ "{{- .JsonKey -}}" ] = {{ .Name }}.Format("{{- .TimeFormat -}}")
 {{- else }}
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
 {{- end -}}
