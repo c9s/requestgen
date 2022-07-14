@@ -312,6 +312,22 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		timeFormatTag, _ := tags.Get("timeFormat")
 		if timeFormatTag != nil {
 			timeFormat = timeFormatTag.Value()
+			switch timeFormat {
+			case "ANSIC":
+				timeFormat = time.ANSIC
+			case "RFC1123":
+				timeFormat = time.RFC1123
+			case "RFC3339":
+				timeFormat = time.RFC3339
+			case "RFC3339Nano":
+				timeFormat = time.RFC3339Nano
+			case "RFC850":
+				timeFormat = time.RFC850
+			case "RFC822":
+				timeFormat = time.RFC822
+			case "RubyDate":
+				timeFormat = time.RubyDate
+			}
 		}
 
 		fieldName := field.Names[0].Name
