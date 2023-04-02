@@ -3,15 +3,15 @@ package requestgen
 import (
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/parser"
 	"go/token"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/packages"
 )
 
 type TypeSelector struct {
@@ -20,56 +20,82 @@ type TypeSelector struct {
 	IsSlice bool
 }
 
+func loadPackageFast(pattern string, tags []string) (*packages.Package, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedName |
+			packages.NeedImports |
+			packages.NeedTypes |
+			packages.NeedTypesInfo |
+			packages.NeedModule |
+			packages.NeedDeps,
+		Tests: false,
+		Logf:  log.Debugf,
+	}
+
+	if len(tags) > 0 {
+		cfg.BuildFlags = []string{fmt.Sprintf("-tags=%s", strings.Join(tags, " "))}
+	}
+
+	log.Debugf("loading package: %s", pattern)
+
+	pkgs, err := packages.Load(cfg, pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pkgs) == 0 {
+		return nil, nil
+	}
+
+	log.Debugf("loaded package: %s (pkgPath %s) -> %#v", pkgs[0].Name, pkgs[0].PkgPath, pkgs[0])
+	return pkgs[0], nil
+}
+
 func sanitizeImport(ts *TypeSelector) (*TypeSelector, error) {
-	buildCtx := build.Default
+	log.Debugf("sanitizing import: %#v", ts)
 
-	cwd, err := os.Getwd()
+	pkg, err := loadPackageFast(ts.Package, nil)
 	if err != nil {
-		return ts, err
+		return nil, err
 	}
 
-	// parse the package file structure and information (this call does not build or compile)
-	bp, err := buildCtx.Import(ts.Package, cwd, build.FindOnly)
-	if err != nil {
-		return ts, fmt.Errorf("can find package %q", ts.Package)
-	}
+	origPath := ts.Package
+	ts.Package = pkg.PkgPath
 
-	if bp.ImportPath == "." {
-		return ts, fmt.Errorf("can not resolve the package import path %s", bp.ImportPath)
-	}
-
-	ts.Package = bp.ImportPath
+	log.Debugf("sanitized import: %s => %s", origPath, ts.Package)
 	return ts, nil
 }
 
-func ParseTypeSelector(main string) (*TypeSelector, error) {
-	if len(main) == 0 {
+func ParseTypeSelector(expr string) (*TypeSelector, error) {
+	if len(expr) == 0 {
 		return nil, errors.New("empty expression")
 	}
 
 	var spec TypeSelector
 
 	// dot references the current package
-	if main[0] == '.' {
-		main = `"."` + main
-	} else if strings.HasPrefix(main, ".[]") {
-		main = main[3:]
+	if expr[0] == '.' {
+		expr = `"."` + expr
+	} else if strings.HasPrefix(expr, ".[]") {
+		expr = expr[3:]
 		spec.IsSlice = true
-	} else if strings.HasPrefix(main, "[]") {
-		main = main[2:]
+	} else if strings.HasPrefix(expr, "[]") {
+		expr = expr[2:]
 		spec.IsSlice = true
 	}
 
-	e, err := parser.ParseExpr(main)
+	e, err := parser.ParseExpr(expr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid expression: %s", main)
+		return nil, errors.Wrapf(err, "invalid expression: %s", expr)
 	}
 
 	switch e := e.(type) {
 	case *ast.Ident:
 		spec.Package = "."
 		spec.Member = e.Name
-		return sanitizeImport(&spec)
+		// return spec
+		return &spec, nil
+		// return sanitizeImport(&spec)
 
 	case *ast.SelectorExpr:
 		x := unparen(e.X)
@@ -99,7 +125,7 @@ func ParseTypeSelector(main string) (*TypeSelector, error) {
 		return nil, fmt.Errorf("expression is not an ident, selector expr or slice expr, %+v given", e)
 	}
 
-	return nil, fmt.Errorf("can not parse type selector: %s", main)
+	return nil, fmt.Errorf("can not parse type selector: %s", expr)
 }
 
 func unparen(e ast.Expr) ast.Expr {
