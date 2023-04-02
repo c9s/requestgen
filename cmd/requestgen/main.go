@@ -1264,12 +1264,18 @@ func main() {
 	}
 }
 
-func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
-	log.Infof("locating object: %#v", ts)
+func locateObject(ts *requestgen.TypeSelector, selectedPkgs []*packages.Package) (types.Object, error) {
+	log.Debugf("locating object: %#v", ts)
 
-	packages, err := loadPackages([]string{ts.Package}, []string{})
-	if err != nil {
-		return nil, err
+	var packages []*packages.Package
+	if len(selectedPkgs) > 0 && (ts.Package == "." || ts.Package == selectedPkgs[0].PkgPath) {
+		packages = selectedPkgs
+	} else {
+		var err error
+		packages, err = loadPackages([]string{ts.Package}, []string{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(packages) == 0 {
@@ -1319,7 +1325,7 @@ func locateObject(ts *requestgen.TypeSelector) (types.Object, error) {
 	return nil, fmt.Errorf("can not find type matches the type selector %+v in the packages %+v", ts, packages)
 }
 
-func parseTypeSelector(sel string, pkgs []*packages.Package) (types.Object, *requestgen.TypeSelector, error) {
+func parseTypeSelector(sel string, selectedPkgs []*packages.Package) (types.Object, *requestgen.TypeSelector, error) {
 	log.Debugf("parsing type selector: %s", sel)
 
 	ts, err := requestgen.ParseTypeSelector(sel)
@@ -1330,10 +1336,10 @@ func parseTypeSelector(sel string, pkgs []*packages.Package) (types.Object, *req
 	log.Debugf("parsed type selector: %#v", ts)
 
 	if ts.Package == "." {
-		ts.Package = pkgs[0].PkgPath
+		ts.Package = selectedPkgs[0].PkgPath
 	}
 
-	o, err := locateObject(ts)
+	o, err := locateObject(ts, selectedPkgs)
 	if err != nil {
 		return nil, ts, err
 	}
