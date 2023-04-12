@@ -29,24 +29,19 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 		},
 		"referenceByType": func(a types.Type) string {
 			switch ua := a.Underlying().(type) {
-			case *types.Slice:
-				log.Debugf("type %v is types.Slice, do not use reference", ua)
-				return ""
-			case *types.Interface:
-				log.Debugf("type %v is types.Interface, do not use reference", ua)
+			case *types.Slice, *types.Interface, *types.Map:
+				log.Debugf("type %v is %T, do not use reference", ua, ua)
 				return ""
 			}
 			return "&"
 		},
 		"toPointer": func(a types.Type) types.Type {
 			switch ua := a.Underlying().(type) {
-			case *types.Slice:
-				log.Debugf("type %v is types.Slice, do not use pointer", ua)
-				return a
-			case *types.Interface:
-				log.Debugf("type %v is types.Interface, do not use pointer", ua)
+			case *types.Slice, *types.Interface, *types.Map:
+				log.Debugf("type %v is %T, do not use pointer", ua, ua)
 				return a
 			}
+
 			return types.NewPointer(a)
 		},
 		"typeString": func(a types.Type) interface{} {
