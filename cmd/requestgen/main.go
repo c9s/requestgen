@@ -5,12 +5,12 @@ requestgen generates the request builder methods.
 2. iterate and filter the fields with json tag.
 3. build up the field object with the parsed metadata
 4. generate the accessor method for each field
-	1. pointer -> optional fields
-	2. literal value -> required fields
-5. parameter builder method should return one of the types:
-	- url.Values
-	- map[string]interface{}
+ 1. pointer -> optional fields
+ 2. literal value -> required fields
 
+5. parameter builder method should return one of the types:
+  - url.Values
+  - map[string]interface{}
 */
 package main
 
@@ -42,9 +42,11 @@ var (
 	debug     = flag.Bool("debug", false, "debug mode")
 	buildTags = flag.String("tags", "", "comma-separated list of build tags to apply")
 
-	typeNamesStr = flag.String("type", "", "comma-separated list of type names; must be set")
-	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
-	apiUrlStr    = flag.String("url", "", "api url endpoint")
+	typeNamesStr  = flag.String("type", "", "comma-separated list of type names; must be set")
+	apiMethodStr  = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
+	apiUrlStr     = flag.String("url", "", "api url endpoint")
+	interfaceName = flag.String("interfaceName", "", "export a interface if given")
+	prefix        = flag.String("prefix", "", "add prefix to your func name")
 
 	parameterType       = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
 	responseTypeSel     = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
@@ -645,6 +647,12 @@ func (g *Generator) generate(typeName string) {
 		g.newline()
 	}
 
+	if *interfaceName != "" {
+		if err := g.generateInterface(funcMap, qf); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	if err := g.generateSetters(funcMap, qf); err != nil {
 		log.Fatal(err)
 	}
@@ -664,7 +672,7 @@ func (g *Generator) generate(typeName string) {
 func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
 	var doFuncTemplate = template.Must(
 		template.New("do").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) (
+func ({{- .ReceiverName }} * {{- typeString .StructType -}}) {{ .Prefix }}Do(ctx context.Context) (
 {{- if and .ResponseDataType .ResponseDataField -}}
 	{{ typeString (toPointer .ResponseDataType) }}
 {{- else -}}
@@ -753,6 +761,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		HasSlugs                       bool
 		HasParameters                  bool
 		HasQueryParameters             bool
+		Prefix                         string
 	}{
 		StructType:         g.structType,
 		ReceiverName:       g.receiverName,
@@ -766,6 +775,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		HasSlugs:           len(g.slugs) > 0,
 		HasParameters:      len(g.fields) > 0,
 		HasQueryParameters: len(g.queryFields) > 0,
+		Prefix:             *prefix,
 	})
 
 	return err
@@ -1079,11 +1089,12 @@ func (g *Generator) generateSetters(funcMap template.FuncMap, qf func(other *typ
 		ReceiverName string
 		Field        Field
 		Qualifier    types.Qualifier
+		Prefix       string
 	}
 
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
+func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Prefix }}{{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
 	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .ReceiverName }}
 }
@@ -1094,6 +1105,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 			Qualifier:    qf,
 			StructType:   g.structType,
 			ReceiverName: g.receiverName,
+			Prefix:       *prefix,
 		})
 		if err != nil {
 			return err
@@ -1106,6 +1118,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 			Qualifier:    qf,
 			StructType:   g.structType,
 			ReceiverName: g.receiverName,
+			Prefix:       *prefix,
 		})
 		if err != nil {
 			return err
@@ -1118,10 +1131,95 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 			Qualifier:    qf,
 			StructType:   g.structType,
 			ReceiverName: g.receiverName,
+			Prefix:       *prefix,
 		})
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (g *Generator) generateInterface(funcMap template.FuncMap, qf func(other *types.Package) string) error {
+	interfaceAndDoTemplate := template.Must(template.New("interface").Funcs(funcMap).Parse(`
+type {{ .InterfaceName }} interface {
+{{ .Prefix }}Do(ctx context.Context) (
+{{- if and .ResponseDataType .ResponseDataField -}}
+	{{ typeString (toPointer .ResponseDataType) }}
+{{- else -}}
+	{{ typeString (toPointer .ResponseType) }}
+{{- end -}}
+	,error)
+`))
+
+	err := interfaceAndDoTemplate.Execute(&g.buf, struct {
+		InterfaceName                  string
+		ResponseType, ResponseDataType types.Type
+		ResponseDataField              string
+		Prefix                         string
+	}{
+		InterfaceName:     *interfaceName,
+		ResponseType:      g.responseType,
+		ResponseDataType:  g.responseDataType,
+		ResponseDataField: *responseDataField,
+		Prefix:            *prefix,
+	})
+	if err != nil {
+		return err
+	}
+
+	type accessorTemplateArgs struct {
+		Field         Field
+		Qualifier     types.Qualifier
+		InterfaceName string
+		Prefix        string
+	}
+	var setterFuncTemplate = template.Must(
+		template.New("accessor").Funcs(funcMap).Parse(`
+{{ .Prefix }}{{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) {{- .InterfaceName }}
+`))
+
+	for _, field := range g.queryFields {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:         field,
+			Qualifier:     qf,
+			InterfaceName: *interfaceName,
+			Prefix:        *prefix,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, field := range g.fields {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:         field,
+			Qualifier:     qf,
+			InterfaceName: *interfaceName,
+			Prefix:        *prefix,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, field := range g.slugs {
+		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
+			Field:         field,
+			Qualifier:     qf,
+			InterfaceName: *interfaceName,
+			Prefix:        *prefix,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	templateEnd := template.Must(template.New("end").Parse(`}`))
+	err = templateEnd.Execute(&g.buf, nil)
+	if err != nil {
+		return err
 	}
 
 	return nil
