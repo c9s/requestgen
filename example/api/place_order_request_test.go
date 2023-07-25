@@ -9,7 +9,7 @@ import (
 func TestPlaceOrderRequest_GetParameters(t *testing.T) {
 	client := NewClient()
 	req := PlaceOrderRequest{client: client}
-	req.Symbol("BTCUSDT").ClientOrderID("0aa1a0123").Side(SideTypeBuy).OrdType(OrderTypeLimit)
+	req.OdrReqSymbol("BTCUSDT").OdrReqClientOrderID("0aa1a0123").OdrReqSide(SideTypeBuy).OdrReqOrdType(OrderTypeLimit)
 	params, err := req.GetParameters()
 	assert.NoError(t, err)
 	assert.NotNil(t, params)
@@ -18,7 +18,7 @@ func TestPlaceOrderRequest_GetParameters(t *testing.T) {
 func TestPlaceOrderRequest_GetQueryParameters(t *testing.T) {
 	client := NewClient()
 	req := PlaceOrderRequest{client: client}
-	req.Symbol("BTCUSDT").ClientOrderID("0aa1a0123").Side(SideTypeBuy).OrdType(OrderTypeLimit).Page(20)
+	req.OdrReqSymbol("BTCUSDT").OdrReqClientOrderID("0aa1a0123").OdrReqSide(SideTypeBuy).OdrReqOrdType(OrderTypeLimit).OdrReqPage(20)
 	params, err := req.GetQueryParameters()
 	assert.NoError(t, err)
 	assert.NotNil(t, params)

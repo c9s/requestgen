@@ -1085,27 +1085,29 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugsMap() (map[string]
 
 func (g *Generator) generateSetters(funcMap template.FuncMap, qf func(other *types.Package) string) error {
 	type accessorTemplateArgs struct {
-		StructType   types.Type
-		ReceiverName string
-		Field        Field
-		Qualifier    types.Qualifier
-		Prefix       string
+		StructType    types.Type
+		ReceiverName  string
+		Field         Field
+		Qualifier     types.Qualifier
+		Prefix        string
+		InterfaceName string
 	}
 
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
-func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Prefix }}{{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
+func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Prefix }}{{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) {{ if ne (len .InterfaceName) 0 }} {{- .InterfaceName }} {{- else }} * {{- typeString .StructType }} {{ end }} {
 	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .ReceiverName }}
 }
 `))
 	for _, field := range g.queryFields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:        field,
-			Qualifier:    qf,
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
-			Prefix:       *prefix,
+			Field:         field,
+			Qualifier:     qf,
+			StructType:    g.structType,
+			ReceiverName:  g.receiverName,
+			Prefix:        *prefix,
+			InterfaceName: *interfaceName,
 		})
 		if err != nil {
 			return err
@@ -1114,11 +1116,12 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Prefix }}{{ .F
 
 	for _, field := range g.fields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:        field,
-			Qualifier:    qf,
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
-			Prefix:       *prefix,
+			Field:         field,
+			Qualifier:     qf,
+			StructType:    g.structType,
+			ReceiverName:  g.receiverName,
+			Prefix:        *prefix,
+			InterfaceName: *interfaceName,
 		})
 		if err != nil {
 			return err
@@ -1127,11 +1130,12 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Prefix }}{{ .F
 
 	for _, field := range g.slugs {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
-			Field:        field,
-			Qualifier:    qf,
-			StructType:   g.structType,
-			ReceiverName: g.receiverName,
-			Prefix:       *prefix,
+			Field:         field,
+			Qualifier:     qf,
+			StructType:    g.structType,
+			ReceiverName:  g.receiverName,
+			Prefix:        *prefix,
+			InterfaceName: *interfaceName,
 		})
 		if err != nil {
 			return err
