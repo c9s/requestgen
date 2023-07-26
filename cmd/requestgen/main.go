@@ -5,12 +5,12 @@ requestgen generates the request builder methods.
 2. iterate and filter the fields with json tag.
 3. build up the field object with the parsed metadata
 4. generate the accessor method for each field
-	1. pointer -> optional fields
-	2. literal value -> required fields
-5. parameter builder method should return one of the types:
-	- url.Values
-	- map[string]interface{}
+ 1. pointer -> optional fields
+ 2. literal value -> required fields
 
+5. parameter builder method should return one of the types:
+  - url.Values
+  - map[string]interface{}
 */
 package main
 
@@ -42,9 +42,10 @@ var (
 	debug     = flag.Bool("debug", false, "debug mode")
 	buildTags = flag.String("tags", "", "comma-separated list of build tags to apply")
 
-	typeNamesStr = flag.String("type", "", "comma-separated list of type names; must be set")
-	apiMethodStr = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
-	apiUrlStr    = flag.String("url", "", "api url endpoint")
+	typeNamesStr   = flag.String("type", "", "comma-separated list of type names; must be set")
+	apiMethodStr   = flag.String("method", "GET", "api method: GET, POST, PUT, DELETE, default to GET")
+	apiUrlStr      = flag.String("url", "", "api url endpoint")
+	useDynamicPath = flag.Bool("dynamicPath", false, "enable dynamic API path")
 
 	parameterType       = flag.String("parameterType", "map", "the parameter type to build, valid: map or url, default: map")
 	responseTypeSel     = flag.String("responseType", "interface{}", "the response type for decoding the API response, this type should be defined in the same package. if not given, interface{} will be used")
@@ -570,7 +571,7 @@ func (g *Generator) generate(typeName string) {
 	g.importPackage("regexp")
 	g.importPackage("reflect")
 
-	if g.apiClientField != nil && *apiUrlStr != "" {
+	if g.apiClientField != nil && (*apiUrlStr != "" || *useDynamicPath) {
 		g.importPackage("net/url")
 		g.importPackage("context")
 
@@ -654,7 +655,7 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	log.Debugf("apiClientField: %v apiUrl: %v", g.apiClientField, apiUrlStr)
-	if g.apiClientField != nil && *apiUrlStr != "" {
+	if g.apiClientField != nil && (*apiUrlStr != "" || *useDynamicPath) {
 		if err := g.generateDoMethod(funcMap); err != nil {
 			log.Fatal(err)
 		}
@@ -664,6 +665,14 @@ func (g *Generator) generate(typeName string) {
 func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
 	var doFuncTemplate = template.Must(
 		template.New("do").Funcs(funcMap).Parse(`
+{{ $recv := .ReceiverName }}
+
+// GetPath returns the request path of the API
+func ({{- .ReceiverName }} * {{- typeString .StructType -}}) GetPath() string {
+	return "{{ .ApiUrl }}"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Context) (
 {{- if and .ResponseDataType .ResponseDataField -}}
 	{{ typeString (toPointer .ResponseDataType) }}
@@ -671,7 +680,6 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	{{ typeString (toPointer .ResponseType) }}
 {{- end -}}
 	,error) {
-	{{ $recv := .ReceiverName }}
     {{ $requestMethod := "NewRequest" }}
     {{- if .ApiAuthenticated -}}
     {{-    $requestMethod = "NewAuthenticatedRequest" }}
@@ -701,10 +709,30 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		return nil, err
 	}
 {{- else }}
-  query := url.Values{}
+  	query := url.Values{}
 {{- end }}
 
-	apiURL := "{{ .ApiUrl }}"
+
+	var apiURL string
+
+	{{- if .DynamicPath }}
+
+	type dynamicPathProvider interface {
+		GetDynamicPath() (string, error)
+	}
+
+	dpp := dynamicPathProvider({{ $recv }})
+	if dPath, err := dpp.GetDynamicPath(); err != nil {
+		return nil, err
+	} else {
+		apiURL = dPath
+	}
+
+	{{- else }}
+
+	apiURL = {{ $recv }}.GetPath()
+
+	{{- end }}
 
 	{{- if .HasSlugs }}
 	slugs, err := {{ $recv }}.GetSlugsMap()
@@ -747,6 +775,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField                 *string
 		ApiMethod                      string
 		ApiUrl                         string
+		DynamicPath                    bool
 		ApiAuthenticated               bool
 		ResponseType, ResponseDataType types.Type
 		ResponseDataField              string
@@ -759,6 +788,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		ApiClientField:     g.apiClientField,
 		ApiMethod:          *apiMethodStr,
 		ApiUrl:             *apiUrlStr,
+		DynamicPath:        *useDynamicPath,
 		ApiAuthenticated:   g.authenticatedApiClient,
 		ResponseType:       g.responseType,
 		ResponseDataType:   g.responseDataType,
