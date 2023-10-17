@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type AuthenticatedRequestBuilder interface {
@@ -88,7 +87,7 @@ func (c *BaseAPIClient) SendRequest(req *http.Request) (*Response, error) {
 
 	// Check error, if there is an error, return the ErrorResponse struct type
 	if response.IsError() {
-		return response, errors.New(string(response.Body))
+		return response, &responseErr{Code: response.StatusCode, Body: response.Body}
 	}
 
 	return response, nil
@@ -110,4 +109,13 @@ func castPayload(payload interface{}) ([]byte, error) {
 	}
 
 	return nil, nil
+}
+
+type responseErr struct {
+	Code int
+	Body []byte
+}
+
+func (e *responseErr) Error() string {
+	return fmt.Sprintf("request failed with status code: %d, body: %q", e.Code, string(e.Body))
 }
