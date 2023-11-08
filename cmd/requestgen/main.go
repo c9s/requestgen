@@ -758,6 +758,16 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		return nil, err
 	}
 
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}	
+	}
+
 {{- if and .ResponseDataType .ResponseDataField }}
 	var data {{ typeString .ResponseDataType }}
 	if err := json.Unmarshal(apiResponse.{{ .ResponseDataField }}, &data) ; err != nil {
