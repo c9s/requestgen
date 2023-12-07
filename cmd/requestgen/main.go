@@ -754,8 +754,11 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	}
 
 	var apiResponse {{ typeString .ResponseType }}
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	if response.IsJSON() {
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	type responseValidator interface {
