@@ -759,7 +759,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		Unmarshal(data []byte) error
 	}
 
-	if unmarshaler, ok := interface{}(apiResponse).(responseUnmarshaler) ; ok {
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler) ; ok {
 		if err := unmarshaler.Unmarshal(response.Body); err != nil {
 			return nil, err
 		}	
@@ -776,7 +776,7 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		Validate() error
 	}
 
-	if validator, ok := interface{}(apiResponse).(responseValidator) ; ok {
+	if validator, ok := interface{}(&apiResponse).(responseValidator) ; ok {
 		if err := validator.Validate(); err != nil {
 			return nil, err
 		}	
