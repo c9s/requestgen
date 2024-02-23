@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -32,6 +33,7 @@ import (
 	"github.com/fatih/camelcase"
 	"github.com/fatih/structtag"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"golang.org/x/tools/go/packages"
 
@@ -52,8 +54,13 @@ var (
 	responseDataTypeSel = flag.String("responseDataType", "", "the data type in the response. this is used to decode data with the response wrapper")
 	responseDataField   = flag.String("responseDataField", "", "the field name of the inner data of the response type")
 
+	rateLimiter               = flag.String("rateLimiter", "", "MUST be 'L+N/M', L is the burst, N is the events count, M is the time duration(s,ms). e.q. 3+2/1s")
+	sharedRateLimiterTypeName = flag.String("sharedRateLimiterTypeName", "", "the name of shared rate limiter")
+
 	outputStdout = flag.Bool("stdout", false, "output generated content to the stdout")
 	output       = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
+
+	rateLimiterRegex = regexp.MustCompile(`^(\d+)\+(\d+)\/(\d+(?:ms|s))$`)
 )
 
 var outputSuffix = "_requestgen.go"
@@ -104,6 +111,11 @@ type Generator struct {
 	simpleTypeValueNames map[string][]Literal
 	stringTypeValues     map[string][]string
 	intTypeValues        map[string][]int64
+
+	rateLimiter struct {
+		Rate  rate.Limit
+		Burst int64
+	}
 }
 
 func (g *Generator) importPackage(pkg string) {
@@ -580,6 +592,9 @@ func (g *Generator) generate(typeName string) {
 			g.importPackage("encoding/json")
 		}
 	}
+	if g.rateLimiter.Rate != 0 {
+		g.importPackage("golang.org/x/time/rate")
+	}
 
 	var usedPkgNames []string
 	for n := range g.importPackages {
@@ -646,6 +661,10 @@ func (g *Generator) generate(typeName string) {
 		g.newline()
 	}
 
+	if err := g.generateGlobalVariables(funcMap); err != nil {
+		log.Fatal(err)
+	}
+
 	if err := g.generateSetters(funcMap, qf); err != nil {
 		log.Fatal(err)
 	}
@@ -660,6 +679,28 @@ func (g *Generator) generate(typeName string) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func (g *Generator) generateGlobalVariables(funcMap template.FuncMap) error {
+	type limiter struct {
+		StructType types.Type
+		Rate       rate.Limit
+		Burst      int64
+	}
+
+	var setterFuncTemplate = template.Must(
+		template.New("globalVariable").Funcs(funcMap).Parse(`
+{{- if ne .Rate 0.0 }} 
+var {{ typeString .StructType }}Limiter = rate.NewLimiter({{ .Rate}}, {{ .Burst }} )
+{{- end }}`))
+
+	setterFuncTemplate.Execute(&g.buf, limiter{
+		StructType: g.structType,
+		Rate:       g.rateLimiter.Rate,
+		Burst:      g.rateLimiter.Burst,
+	})
+
+	return nil
 }
 
 func (g *Generator) generateDoMethod(funcMap template.FuncMap) error {
@@ -680,6 +721,16 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 	{{ typeString (toPointer .ResponseType) }}
 {{- end -}}
 	,error) {
+	{{- if ne .Rate 0.0 }}
+	if err := {{ typeString .StructType }}Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	{{- else if .SharedRateLimiterTypeName }}
+	if err := {{ .SharedRateLimiterTypeName }}Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	{{- end }}
+
     {{ $requestMethod := "NewRequest" }}
     {{- if .ApiAuthenticated -}}
     {{-    $requestMethod = "NewAuthenticatedRequest" }}
@@ -806,20 +857,24 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}}) Do(ctx context.Cont
 		HasSlugs                       bool
 		HasParameters                  bool
 		HasQueryParameters             bool
+		Rate                           rate.Limit
+		SharedRateLimiterTypeName      string
 	}{
-		StructType:         g.structType,
-		ReceiverName:       g.receiverName,
-		ApiClientField:     g.apiClientField,
-		ApiMethod:          *apiMethodStr,
-		ApiUrl:             *apiUrlStr,
-		DynamicPath:        *useDynamicPath,
-		ApiAuthenticated:   g.authenticatedApiClient,
-		ResponseType:       g.responseType,
-		ResponseDataType:   g.responseDataType,
-		ResponseDataField:  *responseDataField,
-		HasSlugs:           len(g.slugs) > 0,
-		HasParameters:      len(g.fields) > 0,
-		HasQueryParameters: len(g.queryFields) > 0,
+		StructType:                g.structType,
+		ReceiverName:              g.receiverName,
+		ApiClientField:            g.apiClientField,
+		ApiMethod:                 *apiMethodStr,
+		ApiUrl:                    *apiUrlStr,
+		DynamicPath:               *useDynamicPath,
+		ApiAuthenticated:          g.authenticatedApiClient,
+		ResponseType:              g.responseType,
+		ResponseDataType:          g.responseDataType,
+		ResponseDataField:         *responseDataField,
+		HasSlugs:                  len(g.slugs) > 0,
+		HasParameters:             len(g.fields) > 0,
+		HasQueryParameters:        len(g.queryFields) > 0,
+		Rate:                      g.rateLimiter.Rate,
+		SharedRateLimiterTypeName: *sharedRateLimiterTypeName,
 	})
 
 	return err
@@ -1226,6 +1281,39 @@ func main() {
 		simpleTypeValueNames:    make(map[string][]Literal),
 		stringTypeValues:        make(map[string][]string),
 		intTypeValues:           make(map[string][]int64),
+	}
+
+	hasRateLimiter := rateLimiter != nil && *rateLimiter != ""
+	if sharedRateLimiterTypeName != nil && *sharedRateLimiterTypeName != "" && hasRateLimiter {
+		log.Fatal("Please choose between sharedRateLimiterTypeName or rateLimiterPerSecond")
+	}
+	if hasRateLimiter {
+		ok := rateLimiterRegex.MatchString(*rateLimiter)
+		if !ok {
+			log.Fatalf("%s is nuexpected format of rateLimiter flag, MUST be L+N/M", *rateLimiter)
+		}
+
+		var err error
+		rateLimiterSlice := rateLimiterRegex.FindStringSubmatch(*rateLimiter)
+		if len(rateLimiterSlice) != 4 {
+			log.Fatalf("%s is an unexpected format of rateLimiter flag, MUST be L+N/M", *rateLimiter)
+		}
+
+		g.rateLimiter.Burst, err = strconv.ParseInt(rateLimiterSlice[1], 10, 64)
+		if err != nil {
+			log.Fatalf("failed to parse burst %s to int: %s", rateLimiterSlice[1], err)
+		}
+
+		n, err := strconv.ParseInt(rateLimiterSlice[2], 10, 64)
+		if err != nil {
+			log.Fatalf("failed to parse time interval %s to duration: %s", rateLimiterSlice[2], err)
+		}
+		d, err := time.ParseDuration(rateLimiterSlice[3])
+		if err != nil {
+			log.Fatalf("failed to parse events count %s to int: %s", rateLimiterSlice[3], err)
+		}
+
+		g.rateLimiter.Rate = rate.Every(d / time.Duration(n))
 	}
 
 	pkgs, err := loadPackages(args, tags)
