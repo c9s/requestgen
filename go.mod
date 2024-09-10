@@ -1,6 +1,6 @@
 module github.com/c9s/requestgen
 
-go 1.18
+go 1.20
 
 require (
 	github.com/fatih/camelcase v1.0.0
