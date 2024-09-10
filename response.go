@@ -34,6 +34,11 @@ func (r *Response) String() string {
 }
 
 func (r *Response) DecodeJSON(o interface{}) error {
+	// handle 204 - No Content
+	if r.StatusCode == 204 && len(r.Body) == 0 {
+		return nil
+	}
+
 	return json.Unmarshal(r.Body, o)
 }
 
