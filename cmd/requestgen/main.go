@@ -87,6 +87,15 @@ type Generator struct {
 	// TODO: clean up the package structure it's redundant
 	pkg            *Package // Package we are scanning.
 	currentPackage *packages.Package
+
+	// importedPackages is the list of imported packages
+	// which are parsed and compiled by the Go package loader
+	importedPackages []*packages.Package
+
+	// usedImports is the list of imported packages that are used in the generated code
+	// it maps pkg name -> package
+	usedImports map[string]*types.Package
+
 	importPackages map[string]struct{}
 
 	responseType, responseDataType types.Type
@@ -259,6 +268,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		paramTag, err := tags.Get("param")
 		if err != nil {
+			log.Errorf("unable to get tag param: %v", err)
 			continue
 		}
 
@@ -270,6 +280,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		// So we need to find the abstract type information from the types info
 		typeValue, ok := g.pkg.pkg.TypesInfo.Types[field.Type]
 		if !ok {
+			log.Errorf("typeValue not found")
 			continue
 		}
 
@@ -348,6 +359,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		validValues, err := parseValidValuesTag(tags, fieldName, argKind)
 		if err != nil {
+			log.WithError(err).Errorf("unable to parse valid values tag")
 			return
 		} else if validValues == nil {
 			if values, ok := g.simpleTypeValueNames[argType.String()]; ok {
@@ -368,6 +380,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		defaultValue, err := parseDefaultTag(tags, fieldName, argKind)
 		if err != nil {
+			log.WithError(err).Errorf("unable to parse default tag")
 			return
 		}
 
@@ -393,6 +406,8 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			File: file,
 		}
 
+		log.Debugf("found field: %s type: %v", f.Name, f.Type)
+
 		// query parameters
 		if isSlug {
 			g.slugs = append(g.slugs, f)
@@ -416,25 +431,21 @@ func (g *Generator) receiverNameWalker(typeName string, file *File) func(ast.Nod
 	}
 }
 
-func isIdent(expr ast.Expr) (string, bool) {
-	switch dt := expr.(type) {
-	case *ast.Ident:
-		return dt.Name, true
-	}
-
-	return "", false
-}
-
+// stringTypesCollectorWalker collects the string types and values
 func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func(ast.Node) bool {
 	return func(node ast.Node) bool {
 		switch decl := node.(type) {
 		case *ast.TypeSpec:
+
 			log.Debugf("TypeSpec: name %s type: %+v\n", decl.Name.String(), decl.Type)
-			if n, ok := isIdent(decl.Type); ok {
-				switch n {
+
+			switch dt := decl.Type.(type) {
+
+			case *ast.Ident:
+				switch dt.Name {
 				case "string", "int", "int8", "int16", "int32", "int64":
-					g.simpleTypes[decl.Name.String()] = n
-					log.Debugf("simple type %s = %s", decl.Name.String(), n)
+					g.simpleTypes[decl.Name.String()] = dt.Name
+					log.Debugf("simple type %s = %s", decl.Name.String(), dt.Name)
 				}
 			}
 
@@ -483,6 +494,7 @@ func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func
 }
 
 // requestStructWalker returns an ast node iterator function for iterating the ast nodes
+// to find the struct type and parse the fields
 func (g *Generator) requestStructWalker(typeName string, file *File) func(ast.Node) bool {
 	return func(node ast.Node) bool {
 		switch decl := node.(type) {
@@ -574,8 +586,7 @@ func (g *Generator) generate(typeName string) {
 	})
 
 	// conf := types.Config{Importer: importer.Default()}
-
-	var usedImports = map[string]*types.Package{}
+	g.usedImports = map[string]*types.Package{}
 
 	g.importPackage("fmt")
 	g.importPackage("net/url")
@@ -601,38 +612,56 @@ func (g *Generator) generate(typeName string) {
 		usedPkgNames = append(usedPkgNames, n)
 	}
 
+	log.Debugf("used package names: %+v", usedPkgNames)
+
 	if len(usedPkgNames) > 0 {
-		usedPkg, err := loadPackages(usedPkgNames, nil)
+		importedPkgs, err := loadPackages(usedPkgNames, nil)
 		if err != nil {
 			log.WithError(err).Errorf("parse package error")
 			return
 		}
 
-		for _, pkg := range usedPkg {
-			usedImports[pkg.Name] = pkg.Types
+		g.importedPackages = importedPkgs
+
+		for _, pkg := range importedPkgs {
+			g.usedImports[pkg.Name] = pkg.Types
 		}
 	}
 
+	// qf is a function to qualify package names
+	// when we generate the code, we need to qualify the package names
 	qf := func(other *types.Package) string {
 		var pkgTypes = g.pkg.pkg.Types
 		var log = log.WithField("template-function", "qualifier")
+
 		if pkgTypes == other {
-			log.Debugf("importing %s from %s: same package object (pointer), no import", other.Path(), pkgTypes.Path())
+			log.Debugf("qf: same package object (pointer), no import: %s == %s",
+				other.Path(),
+				pkgTypes.Path(),
+			)
 			return "" // same package; unqualified
 		}
 
 		if other.Path() == g.currentPackage.PkgPath {
-			log.Debugf("importing %s from %s: same package path, no import", other.Path(), pkgTypes.Path())
+			log.Debugf("qf: same package path (string), no import: %s == %s",
+				other.Path(),
+				pkgTypes.Path(),
+			)
 			return ""
 		}
 
 		// solve imports
 		for _, ip := range pkgTypes.Imports() {
-			log.Debugf("checking import %+v == other(%+v)", ip, other)
+			log.Debugf("qf: checking import %+v == other(%+v)", ip, other)
 			// XXX: check Name() too?
 			if other.Path() == ip.Path() {
-				log.Debugf("importing %s from %s: found imported %s", other.Path(), pkgTypes.Path(), ip)
-				usedImports[ip.Name()] = ip
+				log.Debugf("qf: found foreign import: importing %s from %s as %s (%#v)",
+					other.Path(),
+					pkgTypes.Path(),
+					ip.Name(), ip)
+
+				log.Debugf("qf: adding used import %s as %s", ip, ip.Name())
+				g.usedImports[ip.Name()] = ip
 				return ip.Name()
 			}
 		}
@@ -642,18 +671,30 @@ func (g *Generator) generate(typeName string) {
 	}
 
 	// scan imports in the first run and use the qualifier to register the imports
+	log.Debugf("registering imports from fields: %v", g.fields)
 	for _, field := range g.fields {
 		// reference the types that we will use in our template
 		types.TypeString(field.ArgType, qf)
 	}
+
+	log.Debugf("registering imports from slugs: %v", g.slugs)
+	for _, field := range g.slugs {
+		types.TypeString(field.ArgType, qf)
+	}
+
+	log.Debugf("registering imports from query fields: %v", g.queryFields)
+	for _, field := range g.queryFields {
+		types.TypeString(field.ArgType, qf)
+	}
+
 	types.TypeString(g.responseType, qf)
 	types.TypeString(g.responseDataType, qf)
 
 	var funcMap = templateFuncs(qf)
-	if len(usedImports) > 0 {
+	if len(g.usedImports) > 0 {
 		g.printf("import (")
 		g.newline()
-		for _, importedPkg := range usedImports {
+		for _, importedPkg := range g.usedImports {
 			g.printf("\t%q", importedPkg.Path())
 			g.newline()
 		}
@@ -1430,8 +1471,6 @@ func locateObject(ts *requestgen.TypeSelector, selectedPkgs []*packages.Package)
 		log.Debugf("package %s (%s): %d defs", pkg.Name, pkg.PkgPath, len(pkg.TypesInfo.Defs))
 
 		for ident, obj := range pkg.TypesInfo.Defs {
-			log.Debugf("comparing ident %s <=> %s", ident.Name, ts.Member)
-
 			if ident.Name != ts.Member {
 				continue
 			}
