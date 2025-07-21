@@ -38,14 +38,18 @@ type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
 	tag *string `param:"tag"`
 
-	// "buy" or "sell"
+	// Set side parameter with valid values "buy", "sell"
+	// "required" means the parameter is required.
 	side SideType `param:"side,required" validValues:"buy,sell"`
 
+    // Set order type parameter with valid values "limit", "market"
 	orderType OrderType `param:"ordType" validValues:"limit,market"`
 
 	size string `param:"size"`
 
-	// limit order parameters
+    // For optional fields, you can use pointer to indicate that the field is optional.
+    // 
+	// price is an optional field by using pointer
 	price *string `param:"price,omitempty"`
 
 	timeInForce *TimeInForceType `param:"timeInForce,omitempty" validValues:"GTC,GTT,FOK"`

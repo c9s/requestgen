@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // Response is wrapper for standard http.Response and provides
@@ -47,10 +48,11 @@ func (r *Response) IsError() bool {
 }
 
 func (r *Response) IsJSON() bool {
-	switch r.Header.Get("content-type") {
+	switch strings.ToLower(r.Header.Get("content-type")) {
 	case "text/json", "application/json", "application/json; charset=utf-8":
 		return true
 	}
+
 	return false
 }
 

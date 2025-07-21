@@ -12,13 +12,17 @@ import (
 
 type AuthenticatedRequestBuilder interface {
 	// NewAuthenticatedRequest builds up the http request for authentication-required endpoints
-	NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
+	NewAuthenticatedRequest(
+		ctx context.Context, method, refURL string, params url.Values, payload interface{},
+	) (*http.Request, error)
 }
 
 // APIClient defines the request builder method and request method for the API service
 type APIClient interface {
 	// NewRequest builds up the http request for public endpoints
-	NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
+	NewRequest(
+		ctx context.Context, method, refURL string, params url.Values, payload interface{},
+	) (*http.Request, error)
 
 	// SendRequest sends the request object to the api gateway
 	SendRequest(req *http.Request) (*Response, error)
@@ -49,7 +53,9 @@ type BaseAPIClient struct {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *BaseAPIClient) NewRequest(ctx context.Context, method, refPath string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *BaseAPIClient) NewRequest(
+	ctx context.Context, method, refPath string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	body, err := castPayload(payload)
 	if err != nil {
 		return nil, err
@@ -87,7 +93,7 @@ func (c *BaseAPIClient) SendRequest(req *http.Request) (*Response, error) {
 
 	// Check error, if there is an error, return the ErrorResponse struct type
 	if response.IsError() {
-		return response, &responseErr{Code: response.StatusCode, Body: response.Body}
+		return response, &ErrResponse{Response: response, Body: response.Body}
 	}
 
 	return response, nil
@@ -111,11 +117,11 @@ func castPayload(payload interface{}) ([]byte, error) {
 	return nil, nil
 }
 
-type responseErr struct {
-	Code int
+type ErrResponse struct {
+	*Response
 	Body []byte
 }
 
-func (e *responseErr) Error() string {
-	return fmt.Sprintf("request failed with status code: %d, body: %q", e.Code, string(e.Body))
+func (e *ErrResponse) Error() string {
+	return fmt.Sprintf("request failed with status code: %d, body: %q", e.Response.StatusCode, string(e.Body))
 }
