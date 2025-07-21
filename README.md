@@ -87,6 +87,8 @@ See the [real world application](https://github.com/c9s/bbgo/blob/main/pkg/excha
 
 ### Implementing your HTTP API Client
 
+#### Interacting with Private APIs
+
 For user-specific (APIs needs authentication) HTTP API requests, you can implement your own HTTP API client that satisfies the `AuthenticatedAPIClient` interface, 
 which is a combination of `APIClient` and `AuthenticatedRequestBuilder`. The interface is defined in the `requestgen` package:
 
@@ -107,6 +109,52 @@ type AuthenticatedRequestBuilder interface {
 The `NewAuthenticatedRequest` is a request builder, which is used to create authenticated requests.
 
 Your `NewAuthenticatedRequest` method should attach the authentication headers to the request, such as API keys or bearer token.
+
+#### Interacting with Public APIs
+
+For public HTTP API requests, you can implement your own HTTP API client that satisfies the `APIClient` interface, which is defined in the `requestgen` package:
+
+```go
+type APIClient interface {
+    // NewRequest builds up the http request for public endpoints
+    NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
+
+    // SendRequest sends the request object to the api gateway
+    SendRequest(req *http.Request) (*Response, error)
+}
+```
+
+You can implement the `NewRequest` method to create a new HTTP request for public endpoints, and the `SendRequest` method to send the request and receive the response.
+
+You can also use `requestgen.BaseAPIClient` as a base implementation for your API client, which provides a basic implementation of the `APIClient` interface.
+
+```go
+package api
+
+import (
+    "context"
+    "net/http"
+    "net/url"
+    "github.com/c9s/requestgen"
+)
+
+type RestClient struct {
+    requestgen.BaseAPIClient // Embedding BaseAPIClient to use its methods
+}
+
+func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+    // Implement your authentication logic here
+    // For example, add API key or bearer token to the request headers
+    req, err := c.BaseAPIClient.NewRequest(ctx, method, refURL, params, payload)
+    if err != nil {
+        return nil, err
+    }
+    // Add authentication headers
+    req.Header.Set("Authorization", "Bearer YOUR_TOKEN_HERE")
+    return req, nil
+}
+```
+
 
 ### Embedding Your API Client In Your Request Struct
 
