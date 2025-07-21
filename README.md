@@ -162,12 +162,12 @@ Define your request struct with the `requestgen` tags to specify the endpoint UR
 like this a file `example/api/your_request.go`:
 
 ```go
-//go:generate requestgen -type YourRequest -url "/api/v1/test" -method GET
+//go:generate requestgen -method GET -url "/api/v1/test" -type YourRequest
 type YourRequest struct {
-    // client is an optional field to implement.
     // If the API needs authentication, the client type should be `AuthenticatedAPIClient`. Otherwise, `APIClient`.
     // The `Do()` method will be generated if the client field is provided.
-    // note, you will have to add flag "-url" and "-method" to specify your endpoint and the request method.
+    // 
+    // note, you will have to add flag "-url" and "-method" in the command to specify your endpoint and the request method.
     client requestgen.AuthenticatedAPIClient
 }
 ```
