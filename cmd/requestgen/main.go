@@ -1042,7 +1042,13 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetQueryParameters() (url.
 
 	query := url.Values{}
 	for _k, _v := range params {
-		query.Add(_k, fmt.Sprintf("%v", _v))
+		if {{ $recv }}.isVarSlice(_v) {
+			{{ $recv }}.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k + "[]", fmt.Sprintf("%v", it))
+			})
+		} else {
+			query.Add(_k, fmt.Sprintf("%v", _v))
+		}
 	}
 
 	return query, nil
