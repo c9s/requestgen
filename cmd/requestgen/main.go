@@ -929,27 +929,34 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 {{ $recv := .ReceiverName }}
 
 {{- define "check-required" }}
-{{- if .Required }}
-	// TEMPLATE check-required
-	{{- if .IsString }}
-	if len({{ .Name }}) == 0 {
-		{{- if .Default }}
-        {{ .Name }} = {{ .Default | printf "%q" }}
-		{{- else }}
-		return nil, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
-		{{- end }}
-	}
-	{{- else if .IsInt }}
-	if {{ .Name }} == 0 {
-		{{- if .Default }}
-		{{ .Name }} = {{ .Default }}
-		{{- else }}
-		return nil, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
-		{{- end }}
-	}
+// TEMPLATE check-required
+{{- if .IsString }}
+if len({{ .Name }}) == 0 {
+	{{- if .Default }}
+	{{ .Name }} = {{ .Default | printf "%q" }}
+
+	{{- else if eq .DefaultValuer "uuid()" }}
+
+	{{ .Name }} := uuid.New().String()
+
+	{{- else if eq .DefaultValuer "now()" }}
+
+	{{ .Name }} := time.Now()
+
+	{{- else if .Required }}
+	return nil, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
 	{{- end }}
-	// END TEMPLATE check-required
+}
+{{- else if .IsInt }}
+if {{ .Name }} == 0 {
+	{{- if .Default }}
+	{{ .Name }} = {{ .Default }}
+	{{- else if .Required }}
+	return nil, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+	{{- end }}
+}
 {{- end }}
+// END TEMPLATE check-required
 {{- end }}
 
 {{- define "check-valid-values" }}
@@ -1146,11 +1153,11 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugParameters() (map[s
 
 		{{ template "assign" . }}
 
-	} {{- if .DefaultValuer }} else {
-
-		{{ template "assign-default" . }}
-
-	} {{- end }}
+	} else {
+		{{- if or .DefaultValuer .Default }}
+			{{ template "assign-default" . }}
+		{{- end }}
+	}
 {{- else }}
 	{{ .Name }} := {{- $recv }}.{{ .Name }}
 
