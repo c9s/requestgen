@@ -982,7 +982,13 @@ if {{ .Name }} == 0 {
 {{- else if and .IsTime .TimeFormat }}
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}.Format("{{- .TimeFormat -}}")
 {{- else }}
+	{{- if .IsSlice }}
+	if len({{ .Name }}) > 0 {
+		params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+	}
+	{{- else }}
 	params[ "{{- .JsonKey -}}" ] = {{ .Name }}
+	{{- end }}
 {{- end -}}
 {{- end }}
 

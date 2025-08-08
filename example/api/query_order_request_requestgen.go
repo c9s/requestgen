@@ -30,7 +30,9 @@ func (q *QueryOrderRequest) GetQueryParameters() (url.Values, error) {
 	// END TEMPLATE check-required
 
 	// assign parameter of id
-	params["id"] = id
+	if len(id) > 0 {
+		params["id"] = id
+	}
 
 	query := url.Values{}
 	for _k, _v := range params {
