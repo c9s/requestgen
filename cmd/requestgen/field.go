@@ -19,7 +19,8 @@ type Field struct {
 	Type types.Type
 
 	// ArgType is the argument type of the setter
-	ArgType types.Type
+	ArgType     types.Type
+	ArgElemType types.Type
 
 	ArgKind types.BasicKind
 
@@ -37,8 +38,7 @@ type Field struct {
 
 	TimeFormat string
 
-	// SetterName is the method name of the setter
-	SetterName string
+	SetterName, AdderName string
 
 	// JsonKey is the key that is used for setting the parameters
 	JsonKey string
@@ -52,6 +52,9 @@ type Field struct {
 	File *ast.File
 
 	ValidValues interface{}
+
+	// IsSlice indicates whether the field is a slice type
+	IsSlice bool
 }
 
 func parseDefaultTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {

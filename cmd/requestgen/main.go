@@ -284,15 +284,26 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			continue
 		}
 
-		var argType types.Type
+		var argType, argElemType types.Type
 		var argKind types.BasicKind
 
 		switch a := typeValue.Type.(type) {
 		case *types.Pointer:
 			optional = true
 			argType = a.Elem()
+			argElemType = argType
 		default:
 			argType = a
+			argElemType = argType
+		}
+
+		var adderName string
+		var isSlice bool
+		switch a := typeValue.Type.(type) {
+		case *types.Slice:
+			isSlice = true
+			argElemType = a.Elem()
+			adderName = "Add" + strings.Join(ss, "")
 		}
 
 		argKind = getBasicKind(argType)
@@ -335,23 +346,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		var timeFormat string
 		timeFormatTag, _ := tags.Get("timeFormat")
 		if timeFormatTag != nil {
-			timeFormat = timeFormatTag.Value()
-			switch timeFormat {
-			case "ANSIC":
-				timeFormat = time.ANSIC
-			case "RFC1123":
-				timeFormat = time.RFC1123
-			case "RFC3339":
-				timeFormat = time.RFC3339
-			case "RFC3339Nano":
-				timeFormat = time.RFC3339Nano
-			case "RFC850":
-				timeFormat = time.RFC850
-			case "RFC822":
-				timeFormat = time.RFC822
-			case "RubyDate":
-				timeFormat = time.RubyDate
-			}
+			timeFormat = parseTimeFormat(timeFormatTag.Value())
 		}
 
 		fieldName := field.Names[0].Name
@@ -389,7 +384,9 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			Type:               typeValue.Type,
 			IsSlug:             isSlug,
 			ArgType:            argType,
+			ArgElemType:        argElemType,
 			SetterName:         setterName,
+			AdderName:          adderName,
 			IsString:           isString,
 			IsInt:              isInt,
 			IsTime:             isTime,
@@ -402,8 +399,8 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			ValidValues:        validValues,
 			Default:            defaultValue,
 			DefaultValuer:      defaultValuer,
-
-			File: file,
+			File:               file,
+			IsSlice:            isSlice,
 		}
 
 		log.Debugf("found field: %s type: %v", f.Name, f.Type)
@@ -1250,6 +1247,16 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterNa
 	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .ReceiverName }}
 }
+
+{{- if .Field.IsSlice }}
+
+func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.AdderName }}( {{- .Field.Name }} ...{{ typeString .Field.ArgElemType -}} ) * {{- typeString .StructType }} {
+	{{ .ReceiverName }}.{{ .Field.Name }} = append({{ .ReceiverName }}.{{ .Field.Name }}, {{ .Field.Name }}...)
+	return {{ .ReceiverName }}
+}
+
+{{- end }}
+
 `))
 	for _, field := range g.queryFields {
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
@@ -1576,4 +1583,27 @@ func loadPackages(patterns []string, tags []string) ([]*packages.Package, error)
 	}
 
 	return pkgs, nil
+}
+
+// parseTimeFormat returns the Go time format constant for a given string.
+func parseTimeFormat(format string) string {
+	// only support known formats
+	switch format {
+	case "ANSIC":
+		return time.ANSIC
+	case "RFC1123":
+		return time.RFC1123
+	case "RFC3339":
+		return time.RFC3339
+	case "RFC3339Nano":
+		return time.RFC3339Nano
+	case "RFC850":
+		return time.RFC850
+	case "RFC822":
+		return time.RFC822
+	case "RubyDate":
+		return time.RubyDate
+	default:
+		return format // fallback to original value
+	}
 }
