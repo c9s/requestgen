@@ -238,6 +238,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			continue
 		}
 
+		var docCommentGroup = field.Doc
 		var optional = false
 		var name = field.Names[0].Name
 		var jsonKey = name
@@ -383,6 +384,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			Name:               field.Names[0].Name,
 			Type:               typeValue.Type,
 			IsSlug:             isSlug,
+			DocComment:         docCommentGroup,
 			ArgType:            argType,
 			ArgElemType:        argElemType,
 			SetterName:         setterName,
@@ -934,11 +936,11 @@ if len({{ .Name }}) == 0 {
 
 	{{- else if eq .DefaultValuer "uuid()" }}
 
-	{{ .Name }} := uuid.New().String()
+	{{ .Name }} = uuid.New().String()
 
 	{{- else if eq .DefaultValuer "now()" }}
 
-	{{ .Name }} := time.Now()
+	{{ .Name }} = time.Now()
 
 	{{- else if .Required }}
 	return nil, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
@@ -1249,6 +1251,7 @@ func (g *Generator) generateSetters(funcMap template.FuncMap, qf func(other *typ
 
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
+// {{.Field.SetterName}} sets {{ trim .Field.DocComment.Text }}
 func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
 	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .ReceiverName }}

@@ -22,6 +22,8 @@ type Field struct {
 	ArgType     types.Type
 	ArgElemType types.Type
 
+	DocComment *ast.CommentGroup
+
 	ArgKind types.BasicKind
 
 	IsString bool

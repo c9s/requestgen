@@ -17,6 +17,9 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 
 			return "*" + a
 		},
+		"trim": func(a string) string {
+			return strings.TrimSpace(a)
+		},
 		"camelCase": func(a string) interface{} {
 			return strings.ToLower(string(a[0])) + string(a[1:])
 		},
