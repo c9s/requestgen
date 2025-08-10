@@ -10,8 +10,8 @@ import (
 type WalletType int
 
 const (
-	WalletTypeSpot WalletType = 0
-	WalletTypeMargin WalletType = 1
+	WalletTypeSpot    WalletType = 0
+	WalletTypeMargin  WalletType = 1
 	WalletTypeFunding WalletType = 2
 )
 
@@ -50,13 +50,13 @@ type ComplexArg struct {
 }
 
 type Response struct {
-	Code    string          `json:"code"`
-	Message string          `json:"msg"`
-	CurrentPage int `json:"currentPage"`
-	PageSize    int `json:"pageSize"`
-	TotalNum    int `json:"totalNum"`
-	TotalPage   int `json:"totalPage"`
-	Data    json.RawMessage `json:"data"`
+	Code        string          `json:"code"`
+	Message     string          `json:"msg"`
+	CurrentPage int             `json:"currentPage"`
+	PageSize    int             `json:"pageSize"`
+	TotalNum    int             `json:"totalNum"`
+	TotalPage   int             `json:"totalPage"`
+	Data        json.RawMessage `json:"data"`
 }
 
 type Order struct {
@@ -96,15 +96,16 @@ type Order struct {
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
 
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	// clientOrderID A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
 
+	// symbol is the trading pair symbol, e.g., "BTC-USDT", "ETH-BTC".
 	symbol string `param:"symbol,required"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
 	tag *string `param:"tag"`
 
-	// "buy" or "sell"
+	// side is "buy" or "sell"
 	side SideType `param:"side,required"`
 
 	ordType OrderType `param:"ordType,required" validValues:"limit,market" default:"limit"`
