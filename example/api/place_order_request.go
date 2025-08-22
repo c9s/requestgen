@@ -101,13 +101,15 @@ type Meta struct {
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
 
-	// clientOrderID A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	// clientOrderID A combination of case-sensitive alphanumerics,
+	// all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
 
 	// symbol is the trading pair symbol, e.g., "BTC-USDT", "ETH-BTC".
 	symbol string `param:"symbol,required"`
 
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+	// A combination of case-sensitive alphanumerics, all numbers,
+	// or all letters of up to 8 characters.
 	tag *string `param:"tag"`
 
 	// side is "buy" or "sell"
