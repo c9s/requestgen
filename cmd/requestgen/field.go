@@ -11,6 +11,8 @@ import (
 )
 
 type Field struct {
+	ReceiverName string
+
 	Name string
 
 	// IsSlug is used in the url as a template placeholder (the field name will be the placeholder ID).
@@ -31,6 +33,8 @@ type Field struct {
 	IsInt bool
 
 	IsTime bool
+
+	IsPointer bool
 
 	DefaultValuer string
 

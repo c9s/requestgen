@@ -5,6 +5,9 @@ import (
 	"strings"
 	"text/template"
 
+	// TODO: use this for better title/case conversion
+	// "golang.org/x/text/cases"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,6 +22,9 @@ func templateFuncs(qf types.Qualifier) template.FuncMap {
 		},
 		"trim": func(a string) string {
 			return strings.TrimSpace(a)
+		},
+		"title": func(a string) string {
+			return strings.Title(a)
 		},
 		"camelCase": func(a string) interface{} {
 			return strings.ToLower(string(a[0])) + string(a[1:])

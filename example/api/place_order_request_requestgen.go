@@ -13,69 +13,99 @@ import (
 	"time"
 )
 
-// Page sets page defines the query parameters for something like '?page=123'
+/*
+ * Page sets page defines the query parameters for something like '?page=123'
+ */
 func (p *PlaceOrderRequest) Page(page int64) *PlaceOrderRequest {
 	p.page = &page
 	return p
 }
 
-// ClientOrderID sets A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+/*
+ * ClientOrderID sets clientOrderID A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+ */
 func (p *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
 	p.clientOrderID = &clientOrderID
 	return p
 }
 
-// Symbol sets
+/*
+ * Symbol sets symbol is the trading pair symbol, e.g., "BTC-USDT", "ETH-BTC".
+ */
 func (p *PlaceOrderRequest) Symbol(symbol string) *PlaceOrderRequest {
 	p.symbol = symbol
 	return p
 }
 
-// Tag sets A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+/*
+ * Tag sets A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+ */
 func (p *PlaceOrderRequest) Tag(tag string) *PlaceOrderRequest {
 	p.tag = &tag
 	return p
 }
 
-// Side sets "buy" or "sell"
+/*
+ * Side sets side is "buy" or "sell"
+ */
 func (p *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
 	p.side = side
 	return p
 }
 
-// OrdType sets
+/*
+ * OrdType sets
+ */
 func (p *PlaceOrderRequest) OrdType(ordType OrderType) *PlaceOrderRequest {
 	p.ordType = ordType
 	return p
 }
 
-// Size sets
+/*
+ * Size sets
+ */
 func (p *PlaceOrderRequest) Size(size string) *PlaceOrderRequest {
 	p.size = size
 	return p
 }
 
-// Price sets limit order parameters
+/*
+ * Price sets limit order parameters
+ */
 func (p *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
 	p.price = &price
 	return p
 }
 
-// TimeInForce sets
+/*
+ * TimeInForce sets
+ */
 func (p *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrderRequest {
 	p.timeInForce = &timeInForce
 	return p
 }
 
-// ComplexArg sets
+/*
+ * ComplexArg sets
+ */
 func (p *PlaceOrderRequest) ComplexArg(complexArg ComplexArg) *PlaceOrderRequest {
 	p.complexArg = complexArg
 	return p
 }
 
-// StartTime sets
+/*
+ * StartTime sets
+ */
 func (p *PlaceOrderRequest) StartTime(startTime time.Time) *PlaceOrderRequest {
 	p.startTime = &startTime
+	return p
+}
+
+/*
+ * Meta sets
+ */
+func (p *PlaceOrderRequest) Meta(meta Meta) *PlaceOrderRequest {
+	p.meta = &meta
 	return p
 }
 
@@ -87,6 +117,7 @@ func (p *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
 		page := *p.page
 
 		// TEMPLATE check-required
+
 		if page == 0 {
 		}
 		// END TEMPLATE check-required
@@ -128,7 +159,9 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		params["clientOid"] = clientOrderID
 	} else {
 		// assign default of clientOrderID
+
 		clientOrderID := uuid.New().String()
+
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	}
@@ -183,6 +216,7 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(ordType) == 0 {
+
 		ordType = "limit"
 	}
 	// END TEMPLATE check-required
@@ -260,6 +294,11 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		startTime := *p.startTime
 
 		// TEMPLATE check-required
+
+		if startTime.IsZero() {
+
+			startTime = time.Now()
+		}
 		// END TEMPLATE check-required
 
 		// assign parameter of startTime
@@ -267,11 +306,28 @@ func (p *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 		// assign default of startTime
+
 		startTime := time.Now()
 
 		// assign parameter of startTime
 		// convert time.Time to milliseconds time stamp
 		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
+	}
+	// check meta field -> json key meta
+	if p.meta != nil {
+		meta := *p.meta
+
+		// TEMPLATE check-required
+		// END TEMPLATE check-required
+
+		// assign parameter of meta
+		params["meta"] = meta
+	} else {
+		// assign default of meta
+
+		meta := p.GetDefaultMeta()
+		// assign parameter of meta
+		params["meta"] = meta
 	}
 
 	return params, nil

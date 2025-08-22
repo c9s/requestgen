@@ -92,6 +92,11 @@ type Order struct {
 	TradeType     string `json:"tradeType"`
 }
 
+type Meta struct {
+	MakeVisible int    `json:"make_visible,omitempty"` // 1 to make visible on hit for hidden orders, optional
+	AffCode     string `json:"aff_code,omitempty"`     // affiliate code, optional
+}
+
 //go:generate go run ../../cmd/requestgen -debug -type PlaceOrderRequest -responseType .Response -responseDataField Data -responseDataType .Order
 type PlaceOrderRequest struct {
 	client requestgen.APIClient
@@ -119,8 +124,14 @@ type PlaceOrderRequest struct {
 
 	complexArg ComplexArg `param:"complexArg"`
 
-	startTime *time.Time `param:"startTime,milliseconds" defaultValuer:"now()"`
+	startTime *time.Time `param:"startTime,milliseconds" defaultValuer:"now"`
+
+	meta *Meta `param:"meta" defaultValuer:"method"` // optional metadata for the order, can be any JSON object
 
 	// page defines the query parameters for something like '?page=123'
 	page *int64 `param:"page,query"`
+}
+
+func (r *PlaceOrderRequest) GetDefaultMeta() *Meta {
+	return &Meta{}
 }

@@ -300,16 +300,20 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		var adderName string
 		var isSlice bool
+		var isPointer bool
 		switch a := typeValue.Type.(type) {
 		case *types.Slice:
 			isSlice = true
 			argElemType = a.Elem()
 			adderName = "Add" + strings.Join(ss, "")
+		case *types.Pointer:
+			isPointer = true
 		}
 
 		argKind = getBasicKind(argType)
 		isString := isTypeString(argType)
 		isInt := isTypeInt(argType)
+
 		isTime := argType.String() == "time.Time"
 		required := paramTag.HasOption("required")
 		isMillisecondsTime := paramTag.HasOption("milliseconds")
@@ -334,10 +338,11 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 		if defaultTag != nil {
 			defaultValuer = defaultTag.Value()
 			switch defaultValuer {
-			case "now()":
+			case "now()", "now":
 				g.importPackage("time")
-			case "uuid()":
+			case "uuid()", "uuid":
 				g.importPackage("github.com/google/uuid")
+			case "method()", "method":
 			default:
 				log.Errorf("invalid default valuer: %v", defaultValuer)
 				return
@@ -382,6 +387,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		f := Field{
 			Name:               field.Names[0].Name,
+			ReceiverName:       g.receiverName,
 			Type:               typeValue.Type,
 			IsSlug:             isSlug,
 			DocComment:         docCommentGroup,
@@ -392,6 +398,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			IsString:           isString,
 			IsInt:              isInt,
 			IsTime:             isTime,
+			IsPointer:          isPointer,
 			IsMillisecondsTime: isMillisecondsTime,
 			IsSecondsTime:      isSecondsTime,
 			TimeFormat:         timeFormat,
@@ -932,28 +939,55 @@ func (g *Generator) generateParameterMethods(funcMap template.FuncMap, qf func(o
 {{- if .IsString }}
 if len({{ .Name }}) == 0 {
 	{{- if .Default }}
+
 	{{ .Name }} = {{ .Default | printf "%q" }}
 
-	{{- else if eq .DefaultValuer "uuid()" }}
+	{{- else if or (eq .DefaultValuer "uuid()") (eq .DefaultValuer "uuid") }}
 
 	{{ .Name }} = uuid.New().String()
 
-	{{- else if eq .DefaultValuer "now()" }}
+	{{- else if or (eq .DefaultValuer "now()") (eq .DefaultValuer "now") }}
 
-	{{ .Name }} = time.Now()
+	{{ .Name }} = time.Now().String()
+
+	{{- else if or (eq .DefaultValuer "method()") (eq .DefaultValuer "method") }}
+
+	{{ .Name }} = {{ .ReceiverName }}.GetDefault{{ title .Name }}()
 
 	{{- else if .Required }}
 	return nil, fmt.Errorf("{{ .JsonKey }} is required, empty string given")
 	{{- end }}
 }
 {{- else if .IsInt }}
+
 if {{ .Name }} == 0 {
 	{{- if .Default }}
 	{{ .Name }} = {{ .Default }}
+
+	{{- else if or (eq .DefaultValuer "method()") (eq .DefaultValuer "method") }}
+	{{ .Name }} = {{ .ReceiverName }}.GetDefault{{ title .Name }}()
+
 	{{- else if .Required }}
 	return nil, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
 	{{- end }}
 }
+
+{{- else if .IsTime }}
+
+if {{ .Name }}.IsZero() {
+	{{- if and .DefaultValuer (or (eq .DefaultValuer "now()") (eq .DefaultValuer "now")) }}
+
+	{{ .Name }} = time.Now()
+
+	{{- else if or (eq .DefaultValuer "method()") (eq .DefaultValuer "method") }}
+	{{ .Name }} = {{ .ReceiverName }}.GetDefault{{ title .Name }}()
+
+	{{- else if .Required }}
+	return nil, fmt.Errorf("{{ .JsonKey }} is required, 0 given")
+
+	{{- end }}
+}
+
 {{- end }}
 // END TEMPLATE check-required
 {{- end }}
@@ -996,12 +1030,21 @@ if {{ .Name }} == 0 {
 
 {{- define "assign-default" }}
 	// assign default of {{ .Name }}
-	{{- if eq .DefaultValuer "now()" }}
+	{{- if or (eq .DefaultValuer "now()") (eq .DefaultValuer "now") }}
+
 	{{ .Name }} := time.Now()
 	{{ template "assign" . }}
-	{{- else if eq .DefaultValuer "uuid()" }}
+
+	{{- else if or (eq .DefaultValuer "uuid()") (eq .DefaultValuer "uuid") }}
+
 	{{ .Name }} := uuid.New().String()
+	{{ template "assign" . }}
+
+	{{- else if or (eq .DefaultValuer "method()") (eq .DefaultValuer "method") }}
+
+	{{ .Name }} := {{ .ReceiverName }}.GetDefault{{ title .Name }}()
 	{{- template "assign" . }}
+
 	{{- else if .Default }}
 		{{- if .IsInt }}
 			{{ .Name }} := {{ .Default }}
@@ -1251,7 +1294,9 @@ func (g *Generator) generateSetters(funcMap template.FuncMap, qf func(other *typ
 
 	var setterFuncTemplate = template.Must(
 		template.New("accessor").Funcs(funcMap).Parse(`
-// {{.Field.SetterName}} sets {{ trim .Field.DocComment.Text }}
+/*
+ * {{.Field.SetterName}} sets {{ trim .Field.DocComment.Text }}
+ */
 func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.SetterName }}( {{- .Field.Name }} {{ typeString .Field.ArgType -}} ) * {{- typeString .StructType }} {
 	{{ .ReceiverName }}.{{ .Field.Name }} = {{ if .Field.Optional -}} & {{- end -}} {{ .Field.Name }}
 	return {{ .ReceiverName }}
