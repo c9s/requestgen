@@ -1,8 +1,8 @@
 module github.com/c9s/requestgen
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.6
+toolchain go1.24.0
 
 require (
 	github.com/fatih/camelcase v1.0.0
