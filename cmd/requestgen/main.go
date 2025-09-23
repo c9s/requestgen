@@ -316,6 +316,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 
 		isTime := argType.String() == "time.Time"
 		required := paramTag.HasOption("required")
+		isPrivate := paramTag.HasOption("private")
 		isMillisecondsTime := paramTag.HasOption("milliseconds")
 		isSecondsTime := paramTag.HasOption("seconds")
 		isQuery := paramTag.HasOption("query")
@@ -410,6 +411,7 @@ func (g *Generator) parseStructFields(file *ast.File, typeSpec *ast.TypeSpec, st
 			DefaultValuer:      defaultValuer,
 			File:               file,
 			IsSlice:            isSlice,
+			IsPrivate:          isPrivate,
 		}
 
 		log.Debugf("found field: %s type: %v", f.Name, f.Type)
@@ -1313,6 +1315,10 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.AdderNam
 
 `))
 	for _, field := range g.queryFields {
+		if field.IsPrivate {
+			continue
+		}
+
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:        field,
 			Qualifier:    qf,
@@ -1325,6 +1331,10 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.AdderNam
 	}
 
 	for _, field := range g.fields {
+		if field.IsPrivate {
+			continue
+		}
+
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:        field,
 			Qualifier:    qf,
@@ -1337,6 +1347,10 @@ func ({{- .ReceiverName }} * {{- typeString .StructType -}} ) {{ .Field.AdderNam
 	}
 
 	for _, field := range g.slugs {
+		if field.IsPrivate {
+			continue
+		}
+
 		err := setterFuncTemplate.Execute(&g.buf, accessorTemplateArgs{
 			Field:        field,
 			Qualifier:    qf,

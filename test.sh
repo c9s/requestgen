@@ -28,3 +28,5 @@ go run ./cmd/requestgen -type PlaceOrderRequest -method GET -url "/api/v1/bullet
             go test ./example/api || cat ./example/api/place_order_request_requestgen.go
 
 go run ./cmd/requestgen -type NoParamRequest -url /v1/bullet -method GET -debug ./example/api && go test ./example/api
+
+go run ./cmd/requestgen -type ConstParamValueRequest -url /v1/bullet -method GET -debug ./example/api && go test ./example/api

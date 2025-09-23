@@ -61,6 +61,9 @@ type Field struct {
 
 	// IsSlice indicates whether the field is a slice type
 	IsSlice bool
+
+	// IsPrivate indicates whether the field is private
+	IsPrivate bool
 }
 
 func parseDefaultTag(tags *structtag.Tags, fieldName string, argKind types.BasicKind) (interface{}, error) {
