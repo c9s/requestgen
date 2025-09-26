@@ -93,7 +93,7 @@ func (c *BaseAPIClient) SendRequest(req *http.Request) (*Response, error) {
 
 	// Check error, if there is an error, return the ErrorResponse struct type
 	if response.IsError() {
-		return response, &ErrResponse{Response: response, Body: response.Body}
+		return response, &ErrResponse{Response: response, Body: response.Body, Request: req}
 	}
 
 	return response, nil
@@ -119,7 +119,9 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 type ErrResponse struct {
 	*Response
-	Body []byte
+
+	Request *http.Request
+	Body    []byte
 }
 
 func (e *ErrResponse) Error() string {
