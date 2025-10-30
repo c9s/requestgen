@@ -599,6 +599,7 @@ func (g *Generator) generate(typeName string) {
 	g.importPackage("encoding/json")
 	g.importPackage("regexp")
 	g.importPackage("reflect")
+	g.importPackage("sync")
 
 	if g.apiClientField != nil && (*apiUrlStr != "" || *useDynamicPath) {
 		g.importPackage("net/url")
@@ -1220,9 +1221,21 @@ func ({{- $recv }} * {{- typeString .StructType -}} ) GetSlugParameters() (map[s
 	return params, nil
 }
 
+var {{ typeString .StructType }}SlugReCache sync.Map
+
+{{- $slugReCache := print (typeString .StructType) "SlugReCache" }}
+
 func ({{- $recv }} * {{- typeString .StructType -}} ) applySlugsToUrl(url string, slugs map[string]string) string {
 	for _k, _v := range slugs {
-		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		var needleRE *regexp.Regexp
+
+		if cached, ok := {{ $slugReCache }}.Load(_k) ; ok {
+			needleRE = cached.(*regexp.Regexp)
+		} else {
+			needleRE = regexp.MustCompile(":" + _k + "\\b")
+			{{ $slugReCache }}.Store(_k, needleRE)
+		}
+
 		url = needleRE.ReplaceAllString(url, _v)
 	}
 
@@ -1560,6 +1573,10 @@ func locateObject(ts *requestgen.TypeSelector, selectedPkgs []*packages.Package)
 				case *types.Named:
 					log.Debugf("found named type: %+v", t)
 					log.Debugf("found response type def: %+v -> %+v type:%+v import:%s", ident.Name, obj, obj.Type(), obj.Pkg().Path())
+					return obj, nil
+
+				case *types.Alias:
+					log.Debugf("found alias type: %+v", t)
 					return obj, nil
 
 				case *types.Struct:
