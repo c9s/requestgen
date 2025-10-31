@@ -463,11 +463,16 @@ func (g *Generator) stringTypesCollectorWalker(typeName string, file *File) func
 				return false
 			}
 
+			// if the raw type is already basic types, skip
+			if isBasicType(typeValue.Type) {
+				return false
+			}
+
 			fullQualifiedTypeName := typeValue.Type.String()
 			for _, n := range decl.Names {
 				g.simpleTypeValueNames[fullQualifiedTypeName] = append(g.simpleTypeValueNames[fullQualifiedTypeName], Literal(n.String()))
 			}
-			log.Debugf("simpleTypeValueNames %s = %+v", fullQualifiedTypeName, g.simpleTypeValueNames[fullQualifiedTypeName])
+			log.Debugf("simpleTypeValueNames %s = %+v typeValue = %+v", fullQualifiedTypeName, g.simpleTypeValueNames[fullQualifiedTypeName], typeValue)
 
 			if isTypeString(typeValue.Type) {
 				for _, v := range decl.Values {

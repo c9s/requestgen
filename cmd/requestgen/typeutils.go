@@ -80,6 +80,11 @@ func getBasicKind(a types.Type) types.BasicKind {
 	return 0
 }
 
+func isBasicType(a types.Type) bool {
+	_, ok := a.(*types.Basic)
+	return ok
+}
+
 func isTypeInt(a types.Type) bool {
 	a = getUnderlyingType(a)
 	basic, ok := a.(*types.Basic)

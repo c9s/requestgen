@@ -102,7 +102,7 @@ func parseValidValuesTag(tags *structtag.Tags, fieldName string, argKind types.B
 	logrus.Debugf("%s found valid values: %v", fieldName, validValueList)
 
 	switch argKind {
-	case types.Int, types.Int64, types.Int32:
+	case types.Int, types.Int64, types.Int32, types.Uint, types.Uint32, types.Uint64:
 		var slice []int
 		for _, s := range validValueList {
 			i, err := strconv.Atoi(s)
