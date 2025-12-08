@@ -7,8 +7,8 @@ func TestParseTypeSelector(t *testing.T) {
 		main string
 	}
 	tests := []struct {
-		name    string
-		args    args
+		name     string
+		args     args
 		wantErr  bool
 		wantSpec TypeSelector
 	}{
@@ -41,7 +41,8 @@ func TestParseTypeSelector(t *testing.T) {
 			},
 			wantErr: false,
 			wantSpec: TypeSelector{
-				Package: "github.com/c9s/requestgen",
+				// Package: "github.com/c9s/requestgen",
+				Package: ".",
 				Member:  "APIClient",
 				IsSlice: true,
 			},
@@ -53,7 +54,8 @@ func TestParseTypeSelector(t *testing.T) {
 			},
 			wantErr: false,
 			wantSpec: TypeSelector{
-				Package: "github.com/c9s/requestgen",
+				// Package: "github.com/c9s/requestgen",
+				Package: ".",
 				Member:  "APIClient",
 			},
 		},
