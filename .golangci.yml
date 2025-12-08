@@ -1,0 +1,36 @@
+version: "2"
+run:
+  issues-exit-code: 0
+  tests: true
+linters:
+  default: none
+  enable:
+    - staticcheck
+    - bodyclose
+    - contextcheck
+    - dupword
+    - decorder
+    - goconst
+    - govet
+    - gosec
+    - misspell
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
